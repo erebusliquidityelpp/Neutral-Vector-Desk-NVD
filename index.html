@@ -53,6 +53,8 @@ nav.links a:hover{color:var(--fg)}
 .btn{border:1px solid var(--line);background:var(--surface);padding:10px 18px;border-radius:7px;cursor:pointer;font-size:13.5px;text-decoration:none;color:var(--fg);display:inline-flex;align-items:center;gap:8px}
 .btn:hover{border-color:var(--accent)}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg);font-weight:600}
+.btn.update{background:var(--accent2);border-color:var(--accent2);color:#2a1608;font-weight:600}
+.btn.updated{background:var(--up);border-color:var(--up);color:#06241a;font-weight:600}
 .hero .stats{display:flex;gap:28px;margin-top:40px;flex-wrap:wrap}
 .hero .stat small{display:block;color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px}
 .hero .stat b{font-family:var(--mono);font-size:19px;color:var(--silver)}
@@ -967,7 +969,11 @@ function renderVerdictContent(){
 
 document.getElementById('vbRefresh').addEventListener('click', refreshSignals);
 
-document.getElementById('globalRefresh').addEventListener('click', async ()=>{
+/* ---------- Version check / update button ---------- */
+const CURRENT_VERSION = "1.1";
+let updateAvailable = null; // set to remote version string when a newer one is seen
+
+async function doRefreshData(){
   const btn = document.getElementById('globalRefresh');
   btn.textContent = '⟳ Refreshing…'; btn.disabled = true;
   try{
@@ -975,8 +981,60 @@ document.getElementById('globalRefresh').addEventListener('click', async ()=>{
     if(activeAsset==='crypto' && deribitCache.instruments) await fetchDeribitExpiries();
     if(activeAsset==='forex') await fetchForexSpot();
   }catch(e){ /* individual fetchers already surface their own errors */ }
-  btn.textContent = '⟳ Refresh'; btn.disabled = false;
-});
+  btn.disabled = false;
+  setButtonState();
+}
+
+async function doApplyUpdate(){
+  const btn = document.getElementById('globalRefresh');
+  btn.className = 'btn sm update';
+  btn.textContent = `Updating to v${updateAvailable}…`;
+  btn.disabled = true;
+  try{ sessionStorage.setItem('nvd_justUpdated', updateAvailable); }catch(e){}
+  setTimeout(()=>{ location.reload(); }, 600);
+}
+
+function setButtonState(){
+  const btn = document.getElementById('globalRefresh');
+  if(updateAvailable){
+    btn.className = 'btn sm update';
+    btn.textContent = `⬆ Update v${updateAvailable}`;
+    btn.onclick = doApplyUpdate;
+  } else {
+    btn.className = 'btn sm';
+    btn.textContent = '⟳ Refresh';
+    btn.onclick = doRefreshData;
+  }
+}
+
+async function checkForUpdate(){
+  try{
+    const res = await fetch(`./version.json?t=${Date.now()}`, {cache:'no-store'});
+    if(!res.ok) return;
+    const data = await res.json();
+    if(data.version && data.version !== CURRENT_VERSION){
+      updateAvailable = data.version;
+      setButtonState();
+    }
+  }catch(e){ /* version.json may not exist on every host (e.g. a standalone copy) — fail silently */ }
+}
+
+(function initVersioning(){
+  document.getElementById('verChip').textContent = `v${CURRENT_VERSION}`;
+  let justUpdated = null;
+  try{ justUpdated = sessionStorage.getItem('nvd_justUpdated'); }catch(e){}
+  if(justUpdated){
+    try{ sessionStorage.removeItem('nvd_justUpdated'); }catch(e){}
+    const btn = document.getElementById('globalRefresh');
+    btn.className = 'btn sm updated';
+    btn.textContent = `✓ Updated to v${CURRENT_VERSION}`;
+    setTimeout(()=>{ updateAvailable=null; setButtonState(); }, 2200);
+  } else {
+    setButtonState();
+  }
+  checkForUpdate();
+  setInterval(checkForUpdate, 90000);
+})();
 
 renderCards();
 renderInputs();
