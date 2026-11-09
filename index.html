@@ -11,7 +11,7 @@
 :root{
   color-scheme:dark;
   --bg:#0c0a12; --surface:#17141f; --surface2:#1e1a29; --line:#332c42;
-  --fg:#e7e4ee; --muted:#a9adbd; --accent:#a855f7; --accent2:#e2995f; --accent-fg:#1a0a24;
+  --fg:#e7e4ee; --muted:#a9adbd; --accent:#6d28d9; --accent2:#e2995f; --accent-fg:#f5f0ff;
   --silver:#c7ccd6;
   --up:#2fbf71; --down:#f0616d; --warn:#e3b341; --shadow:0 10px 30px rgba(0,0,0,.5);
   --sans:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
@@ -157,7 +157,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
         <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
           <defs>
             <linearGradient id="nvGradA" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stop-color="#a855f7"/><stop offset="1" stop-color="#7c3aed"/>
+              <stop offset="0" stop-color="#6d28d9"/><stop offset="1" stop-color="#3b0f70"/>
             </linearGradient>
             <linearGradient id="nvGradB" x1="1" y1="0" x2="0" y2="1">
               <stop offset="0" stop-color="#e2995f"/><stop offset="1" stop-color="#c77a42"/>
@@ -511,8 +511,8 @@ function drawChart(curve, spot, breakevens, minP, maxP){
     <rect x="0" y="0" width="${W}" height="${H}" fill="none"/>
     ${gridlines.join('')}
     <line x1="${ML}" y1="${zeroY}" x2="${W-MR}" y2="${zeroY}" stroke="#8393a7" stroke-width="1" stroke-dasharray="3,3"/>
-    <line x1="${X(spot).toFixed(1)}" y1="${MT}" x2="${X(spot).toFixed(1)}" y2="${MT+plotH}" stroke="#a855f7" stroke-width="1" stroke-dasharray="2,2"/>
-    <text x="${X(spot).toFixed(1)}" y="${MT-6}" fill="#a855f7" font-size="10" font-family="IBM Plex Mono,monospace" text-anchor="middle">spot</text>
+    <line x1="${X(spot).toFixed(1)}" y1="${MT}" x2="${X(spot).toFixed(1)}" y2="${MT+plotH}" stroke="#6d28d9" stroke-width="1" stroke-dasharray="2,2"/>
+    <text x="${X(spot).toFixed(1)}" y="${MT-6}" fill="#6d28d9" font-size="10" font-family="IBM Plex Mono,monospace" text-anchor="middle">spot</text>
     <path d="${path}" fill="none" stroke="#2fbf71" stroke-width="2.2"/>
     ${breakevens.map(b=>`<circle cx="${X(b).toFixed(1)}" cy="${zeroY.toFixed(1)}" r="4" fill="#e2995f"/>`).join('')}
   `;
