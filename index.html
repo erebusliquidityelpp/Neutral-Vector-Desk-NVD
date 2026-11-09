@@ -28,7 +28,7 @@ h1,h2,h3,p{margin:0}
 button,select,input{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 a{color:var(--accent)}
-.wrap{max-width:1080px;margin:0 auto;padding:0 8px}
+.wrap{max-width:1400px;margin:0 auto;padding:0 8px}
 
 /* header */
 header.top{position:sticky;top:0;z-index:20;background:rgba(11,15,20,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
@@ -109,6 +109,15 @@ section p.sdesc{color:var(--muted);margin-top:10px;font-size:14px;line-height:1.
 @media(max-width:700px){.vb-body{grid-template-columns:1fr}}
 .vmenu{display:flex;flex-direction:column;gap:4px}
 .vmitem{display:flex;justify-content:space-between;align-items:center;gap:8px;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:9px 11px;cursor:pointer;font-size:13px;text-align:left}
+.vmitem .vmleft{display:flex;align-items:center;gap:7px;min-width:0}
+.vstar{border:0;background:none;cursor:pointer;font-size:14px;color:var(--line);line-height:1;flex:none;padding:0}
+.vstar:hover{color:var(--accent2)}
+.vstar.on{color:var(--accent2)}
+.wlgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.wlcard{border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.wlcard .wlh{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.wlcard .wlh b{font-size:14px}
+.wlempty{border:1px dashed var(--line);border-radius:10px;padding:24px;text-align:center;color:var(--muted);font-size:13px}
 .vmitem:hover{border-color:var(--accent)}
 .vmitem.on{border-color:var(--accent);background:var(--surface2)}
 .vpill{font:700 10.5px var(--mono);letter-spacing:.05em;padding:2px 9px;border-radius:999px;border:1px solid var(--line);white-space:nowrap}
@@ -180,9 +189,10 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
     <nav class="links">
       <a href="#strategies">Strategies</a>
       <a href="#builder">Builder</a>
+      <a href="#watchlist">Watchlist</a>
       <a href="#glossary">Glossary</a>
     </nav>
-    <span class="chip verchip" id="verChip">v1.2</span>
+    <span class="chip verchip" id="verChip">v1.3</span>
     <button class="btn sm" id="globalRefresh">⟳ Refresh</button>
     <span class="chip"><span class="dot"></span> Client-side · no stored data</span>
   </div>
@@ -248,6 +258,17 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
         <div class="caution" id="caution"></div>
       </div>
     </div>
+  </div>
+</section>
+
+<section id="watchlist">
+  <div class="wrap">
+    <div class="shead">
+      <div class="kicker">Watchlist</div>
+      <h3 class="stitle">Starred structures</h3>
+      <p class="sdesc">Star a structure in the Market Signal Verdicts menu above to pin it here with its current verdict. Saved locally in your browser.</p>
+    </div>
+    <div id="wlHost"></div>
   </div>
 </section>
 
@@ -811,22 +832,50 @@ async function fetchDominance(){
   const data = await res.json();
   return {btcDom: data.data.market_cap_percentage.btc, totalMcap: data.data.total_market_cap.usd};
 }
+async function fetchPcrSkew(ccy){
+  const res = await fetch(`https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency=${ccy}&kind=option`);
+  const data = await res.json();
+  const rows = (data.result||[]).filter(r=>r.open_interest>0 && r.mark_iv!=null);
+  const calls = rows.filter(r=>r.instrument_name.endsWith('-C'));
+  const puts = rows.filter(r=>r.instrument_name.endsWith('-P'));
+  const callOI = calls.reduce((s,r)=>s+r.open_interest,0);
+  const putOI = puts.reduce((s,r)=>s+r.open_interest,0);
+  const avgCallIv = calls.length ? calls.reduce((s,r)=>s+r.mark_iv,0)/calls.length : null;
+  const avgPutIv = puts.length ? puts.reduce((s,r)=>s+r.mark_iv,0)/puts.length : null;
+  return {
+    pcr: callOI>0 ? putOI/callOI : null,
+    skew: (avgPutIv!=null && avgCallIv!=null) ? avgPutIv-avgCallIv : null,
+    totalOI: callOI+putOI
+  };
+}
+async function fetchMempool(){
+  const [feeRes, poolRes] = await Promise.all([
+    fetch('https://mempool.space/api/v1/fees/recommended'),
+    fetch('https://mempool.space/api/mempool')
+  ]);
+  const fee = await feeRes.json();
+  const pool = await poolRes.json();
+  return {fee: fee.fastestFee, count: pool.count};
+}
 
 async function refreshSignals(){
   const ccy = document.getElementById('vbCcy').value;
   const st = document.getElementById('vbStatus');
   st.innerHTML = `<span class="ld"></span>Loading…`;
   try{
-    const [atm, rv, funding, fng, dom] = await Promise.all([
-      fetchAtmIv(ccy), fetchRealizedVol(ccy), fetchFunding(ccy), fetchFng(), fetchDominance()
+    const [atm, rv, funding, fng, dom, ps, mp] = await Promise.all([
+      fetchAtmIv(ccy), fetchRealizedVol(ccy), fetchFunding(ccy), fetchFng(), fetchDominance(),
+      fetchPcrSkew(ccy), ccy==='BTC' ? fetchMempool().catch(()=>null) : Promise.resolve(null)
     ]);
     signals = {ccy, markIv: atm.iv, spot: atm.spot, realizedVol: rv, funding8h: funding,
-      fng: fng.value, fngLabel: fng.label, btcDom: dom.btcDom, totalMcap: dom.totalMcap, ts: Date.now()};
+      fng: fng.value, fngLabel: fng.label, btcDom: dom.btcDom, totalMcap: dom.totalMcap,
+      pcr: ps.pcr, skew: ps.skew, totalOI: ps.totalOI,
+      mempoolFee: mp?mp.fee:null, mempoolCount: mp?mp.count:null, ts: Date.now()};
     st.innerHTML = `<span class="ld ok"></span>Updated ${new Date().toLocaleTimeString()}`;
   }catch(e){
     st.innerHTML = `<span class="ld err"></span>Signal fetch failed (${e.message})`;
   }
-  renderVerdictMenu(); renderVerdictContent();
+  renderVerdictMenu(); renderVerdictContent(); renderWatchlist();
 }
 
 function verdictFor(id, s){
@@ -834,6 +883,7 @@ function verdictFor(id, s){
   const fundingPct = (s.funding8h||0)*100;
   const fundingExtreme = Math.abs(fundingPct) > 0.05;
   const fngExtreme = s.fng<=20 || s.fng>=80;
+  const crowded = s.pcr!=null && (s.pcr>1.3 || s.pcr<0.6);
 
   if(id==='straddle' || id==='strangle'){
     if(ivPrem < -3 || fngExtreme){
@@ -846,10 +896,11 @@ function verdictFor(id, s){
     return {cls:'caution', label:'CAUTION', reason:`IV vs realized is roughly fair (${ivPrem>=0?'+':''}${ivPrem.toFixed(1)} pts) — no strong premium edge either way.`};
   }
   if(id==='condor'){
-    if(fngExtreme || fundingExtreme){
+    if(fngExtreme || fundingExtreme || crowded){
       const bits=[];
       if(fngExtreme) bits.push(`sentiment extreme (${s.fngLabel})`);
       if(fundingExtreme) bits.push(`funding stretched (${fundingPct.toFixed(3)}%/8h)`);
+      if(crowded) bits.push(`put/call OI ratio lopsided (${s.pcr.toFixed(2)})`);
       return {cls:'avoid', label:'AVOID', reason:`${bits.join(' and ')} — crowd positioning raises breakout/squeeze risk against a range-bound structure.`};
     }
     if(ivPrem > 3) return {cls:'go', label:'GO', reason:`Implied vol is running ${ivPrem.toFixed(1)} pts above realized — selling premium is being paid more than recent movement justifies.`};
@@ -861,7 +912,13 @@ function verdictFor(id, s){
     return {cls:'caution', label:'CAUTION', reason:`Low realized vol (${s.realizedVol.toFixed(1)}%) means thinner gamma-scalping opportunity — mostly a theta/funding carry environment right now.`};
   }
   if(id==='butterfly' || id==='brokenwing'){
-    if(fngExtreme || fundingExtreme) return {cls:'avoid', label:'AVOID', reason:`${fngExtreme?`Sentiment extreme (${s.fngLabel})`:''}${fngExtreme&&fundingExtreme?' and ':''}${fundingExtreme?`funding stretched (${fundingPct.toFixed(3)}%/8h)`:''} — this structure's profit zone is narrower than a condor's, so it tolerates a breakout even worse.`};
+    if(fngExtreme || fundingExtreme || crowded){
+      const bits=[];
+      if(fngExtreme) bits.push(`sentiment extreme (${s.fngLabel})`);
+      if(fundingExtreme) bits.push(`funding stretched (${fundingPct.toFixed(3)}%/8h)`);
+      if(crowded) bits.push(`put/call OI ratio lopsided (${s.pcr.toFixed(2)})`);
+      return {cls:'avoid', label:'AVOID', reason:`${bits.join(' and ')} — this structure's profit zone is narrower than a condor's, so it tolerates a breakout even worse.`};
+    }
     if(ivPrem > 2) return {cls:'go', label:'GO', reason:`Implied vol is ${ivPrem.toFixed(1)} pts above realized — a pinned, premium-selling structure is being paid fairly for a quiet market that's actually showing up.`};
     return {cls:'caution', label:'CAUTION', reason:`IV premium isn't clearly rich (${ivPrem>=0?'+':''}${ivPrem.toFixed(1)} pts) for how narrow this structure's profit zone is.`};
   }
@@ -872,7 +929,13 @@ function verdictFor(id, s){
     return {cls:'caution', label:'CAUTION', reason:`IV vs realized is roughly fair (${ivPrem>=0?'+':''}${ivPrem.toFixed(1)} pts) — edge depends more on the term-structure shape than this spot check alone.`};
   }
   if(id==='putratio' || id==='callratio'){
-    if(fngExtreme || fundingExtreme) return {cls:'avoid', label:'AVOID', reason:`${fngExtreme?`Sentiment extreme (${s.fngLabel})`:''}${fngExtreme&&fundingExtreme?' and ':''}${fundingExtreme?`funding stretched (${fundingPct.toFixed(3)}%/8h)`:''} — the uncapped side of this structure is exactly the side a squeeze would hit.`};
+    if(fngExtreme || fundingExtreme || crowded){
+      const bits=[];
+      if(fngExtreme) bits.push(`sentiment extreme (${s.fngLabel})`);
+      if(fundingExtreme) bits.push(`funding stretched (${fundingPct.toFixed(3)}%/8h)`);
+      if(crowded) bits.push(`put/call OI ratio lopsided (${s.pcr.toFixed(2)})`);
+      return {cls:'avoid', label:'AVOID', reason:`${bits.join(' and ')} — the uncapped side of this structure is exactly the side a squeeze would hit.`};
+    }
     if(ivPrem > 4) return {cls:'go', label:'GO', reason:`Implied vol is ${ivPrem.toFixed(1)} pts above realized — worth collecting, but remember the short side here is uncapped, unlike a condor.`};
     return {cls:'caution', label:'CAUTION', reason:`Premium isn't clearly rich enough (${ivPrem>=0?'+':''}${ivPrem.toFixed(1)} pts) to justify taking on uncapped tail risk for this credit.`};
   }
@@ -887,17 +950,49 @@ function verdictFor(id, s){
   return {cls:'caution', label:'CAUTION', reason:'No verdict logic defined for this structure yet.'};
 }
 
+function getWatchlist(){
+  try{ return JSON.parse(localStorage.getItem('nvd_watchlist')||'[]'); }catch(e){ return []; }
+}
+function isWatched(id){ return getWatchlist().includes(id); }
+function toggleWatch(id){
+  let wl = getWatchlist();
+  wl = wl.includes(id) ? wl.filter(x=>x!==id) : [...wl, id];
+  localStorage.setItem('nvd_watchlist', JSON.stringify(wl));
+  renderVerdictMenu(); renderWatchlist();
+}
+
 function renderVerdictMenu(){
   const host = document.getElementById('vmenu');
   host.innerHTML = VSTRATS.map(s=>{
     const v = signals ? verdictFor(s.id, signals) : null;
+    const starred = isWatched(s.id);
     return `<button class="vmitem ${s.id===activeVstrat?'on':''}" data-v="${s.id}">
-      <span>${s.label}</span>${v?`<span class="vpill v-${v.cls}">${v.label}</span>`:''}
+      <span class="vmleft"><span class="vstar ${starred?'on':''}" data-star="${s.id}">${starred?'★':'☆'}</span><span>${s.label}</span></span>
+      ${v?`<span class="vpill v-${v.cls}">${v.label}</span>`:''}
     </button>`;
   }).join('');
-  host.querySelectorAll('.vmitem').forEach(b=>b.addEventListener('click',()=>{
+  host.querySelectorAll('.vmitem').forEach(b=>b.addEventListener('click',(e)=>{
+    if(e.target.dataset.star) return;
     activeVstrat = b.dataset.v; renderVerdictMenu(); renderVerdictContent();
   }));
+  host.querySelectorAll('.vstar').forEach(el=>el.addEventListener('click',(e)=>{
+    e.stopPropagation(); toggleWatch(el.dataset.star);
+  }));
+}
+
+function renderWatchlist(){
+  const host = document.getElementById('wlHost');
+  const wl = getWatchlist();
+  if(!wl.length){ host.innerHTML = `<div class="wlempty">No structures starred yet.</div>`; return; }
+  host.innerHTML = `<div class="wlgrid">${wl.map(id=>{
+    const meta = VSTRATS.find(s=>s.id===id);
+    if(!meta) return '';
+    const v = signals ? verdictFor(id, signals) : null;
+    return `<div class="wlcard">
+      <div class="wlh"><b>${meta.label}</b>${v?`<span class="vpill v-${v.cls}">${v.label}</span>`:'<span class="vpill">—</span>'}</div>
+      <div class="note">${v?v.reason:'Click "Refresh signals" in Market Signal Verdicts to get a reading.'}</div>
+    </div>`;
+  }).join('')}</div>`;
 }
 
 function legsFromDefaults(d){
@@ -926,12 +1021,11 @@ function computeStrategyMetrics(stratId){
   return {strat, maxP, minP, breakevens, netPrem, spot, mult};
 }
 
-function renderVerdictContent(){
-  const host = document.getElementById('vcontent');
-  const snap = computeStrategyMetrics(activeVstrat);
-
-  const snapHtml = snap ? `
+function snapshotHtml(snap, v){
+  if(!snap) return `<div class="note">Delta-neutral/hedged has no fixed legs — it's an actively rebalanced book, so there's no single example structure to snapshot. The verdict reflects whether current realized vol justifies the rebalancing effort.</div>`;
+  return `
     <table class="vtab">
+      ${v?`<tr><td>Verdict</td><td><span class="vpill v-${v.cls}">${v.label}</span></td></tr>`:''}
       <tr><td>Legs (example strikes)</td><td>${snap.strat.legs.join(' · ')}</td></tr>
       <tr><td>Premium type</td><td>${snap.strat.premium}</td></tr>
       <tr><td>Theta</td><td>${snap.strat.theta}</td></tr>
@@ -941,10 +1035,15 @@ function renderVerdictContent(){
       <tr><td>Net ${snap.netPrem>=0?'debit':'credit'} (example)</td><td>$${Math.abs(snap.netPrem*snap.mult).toFixed(0)}</td></tr>
     </table>
     <div class="note">Structure snapshot uses this card's illustrative example strikes/premiums (spot ${snap.spot}), not live prices — load it into the builder above to price your own strikes.</div>
-  ` : `<div class="note">Delta-neutral/hedged has no fixed legs — it's an actively rebalanced book, so there's no single example structure to snapshot. The verdict reflects whether current realized vol justifies the rebalancing effort.</div>`;
+  `;
+}
+
+function renderVerdictContent(){
+  const host = document.getElementById('vcontent');
+  const snap = computeStrategyMetrics(activeVstrat);
 
   if(!signals){
-    host.innerHTML = `<div class="note">Click "Refresh signals" above to pull live IV, realized vol, funding, sentiment and dominance data for the verdict.</div>` + snapHtml;
+    host.innerHTML = `<div class="note">Click "Refresh signals" above to pull live IV, realized vol, funding, sentiment, dominance, put/call skew and on-chain data for the verdict.</div>` + snapshotHtml(snap, null);
     return;
   }
   const v = verdictFor(activeVstrat, signals);
@@ -955,24 +1054,29 @@ function renderVerdictContent(){
       <span class="vc-why">${v.reason}</span>
     </div>
     <table class="vtab">
+      <tr><td>Verdict</td><td><span class="vpill v-${v.cls}">${v.label}</span></td></tr>
       <tr><td>Spot (${s.ccy})</td><td>$${s.spot.toFixed(2)}</td></tr>
       <tr><td>ATM mark IV</td><td>${s.markIv.toFixed(1)}%</td></tr>
       <tr><td>Realized vol</td><td>${s.realizedVol.toFixed(1)}%</td></tr>
       <tr><td>IV − realized</td><td>${(s.markIv-s.realizedVol>=0?'+':'')}${(s.markIv-s.realizedVol).toFixed(1)} pts</td></tr>
+      <tr><td>Put/Call OI ratio</td><td>${s.pcr!=null?s.pcr.toFixed(2):'—'}</td></tr>
+      <tr><td>Put − Call IV skew</td><td>${s.skew!=null?(s.skew>=0?'+':'')+s.skew.toFixed(1)+' pts':'—'}</td></tr>
+      <tr><td>Total option OI (${s.ccy})</td><td>${s.totalOI!=null?s.totalOI.toLocaleString():'—'}</td></tr>
       <tr><td>Perp funding (8h)</td><td>${s.funding8h!=null?(s.funding8h*100).toFixed(4)+'%':'—'}</td></tr>
       <tr><td>Fear &amp; Greed</td><td>${s.fng} (${s.fngLabel})</td></tr>
       <tr><td>BTC dominance</td><td>${s.btcDom.toFixed(1)}%</td></tr>
       <tr><td>Total crypto mcap</td><td>$${(s.totalMcap/1e9).toFixed(1)}B</td></tr>
+      ${s.mempoolFee!=null?`<tr><td>BTC mempool fee (sat/vB)</td><td>${s.mempoolFee}</td></tr><tr><td>BTC mempool backlog</td><td>${s.mempoolCount.toLocaleString()} tx</td></tr>`:''}
     </table>
-    <div class="note">As of ${new Date(s.ts).toLocaleTimeString()}. Verdict is a transparent heuristic from IV-vs-realized spread, funding stretch and sentiment extremes — not a guarantee. Cross-check against the strategy card's caution line above.</div>
-    ${snapHtml}
+    <div class="note">As of ${new Date(s.ts).toLocaleTimeString()}. Verdict is a transparent heuristic from IV-vs-realized spread, funding stretch, put/call positioning and sentiment extremes — not a guarantee. Cross-check against the strategy card's caution line above.</div>
+    ${snapshotHtml(snap, v)}
   `;
 }
 
 document.getElementById('vbRefresh').addEventListener('click', refreshSignals);
 
 /* ---------- Version check / update button ---------- */
-const CURRENT_VERSION = "1.2";
+const CURRENT_VERSION = "1.3";
 let updateAvailable = null; // set to remote version string when a newer one is seen
 
 async function doRefreshData(){
@@ -1045,6 +1149,7 @@ renderTabs();
 renderLivePanel();
 renderVerdictMenu();
 renderVerdictContent();
+renderWatchlist();
 </script>
 </body>
 </html>
