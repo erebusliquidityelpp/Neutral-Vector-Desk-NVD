@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>NEUTRAL VECTOR DESK</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2317141f'/%3E%3Cpolygon points='9,8 9,24 17,16' fill='%236d28d9'/%3E%3Cpolygon points='23,8 23,24 15,16' fill='%23e2995f'/%3E%3Ccircle cx='16' cy='16' r='2' fill='%23c7ccd6'/%3E%3C/svg%3E">
+<meta name="theme-color" content="#17141f">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -180,7 +182,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
       <a href="#builder">Builder</a>
       <a href="#glossary">Glossary</a>
     </nav>
-    <span class="chip verchip" id="verChip">v1.1</span>
+    <span class="chip verchip" id="verChip">v1.2</span>
     <button class="btn sm" id="globalRefresh">⟳ Refresh</button>
     <span class="chip"><span class="dot"></span> Client-side · no stored data</span>
   </div>
@@ -970,7 +972,7 @@ function renderVerdictContent(){
 document.getElementById('vbRefresh').addEventListener('click', refreshSignals);
 
 /* ---------- Version check / update button ---------- */
-const CURRENT_VERSION = "1.1";
+const CURRENT_VERSION = "1.2";
 let updateAvailable = null; // set to remote version string when a newer one is seen
 
 async function doRefreshData(){
