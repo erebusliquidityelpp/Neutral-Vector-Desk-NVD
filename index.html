@@ -192,7 +192,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
       <a href="#watchlist">Watchlist</a>
       <a href="#glossary">Glossary</a>
     </nav>
-    <span class="chip verchip" id="verChip">v1.3</span>
+    <span class="chip verchip" id="verChip">v1.4</span>
     <button class="btn sm" id="globalRefresh">⟳ Refresh</button>
     <span class="chip"><span class="dot"></span> Client-side · no stored data</span>
   </div>
@@ -373,6 +373,37 @@ const STRATEGIES = [
     legs:['Buy Call K1','Sell Call K2','Sell Put K1','Buy Put K2'], theta:'Flat', premium:'Debit',
     defaults:{spot:100, legA:{type:'call',side:'buy',strike:98,premium:5.0}, legB:{type:'call',side:'sell',strike:102,premium:2.2},
       legC:{type:'put',side:'sell',strike:98,premium:1.9}, legD:{type:'put',side:'buy',strike:102,premium:4.6}}
+  },
+  {
+    id:'callbackspread', name:'Call Backspread', bias:'neutral', dir:'Long volatility (upside-skewed)',
+    desc:'Sell one call near the money, buy two further OTM calls. Usually a small net credit or near-zero cost; profits on a sharp rally, small loss if price drifts up slowly, limited loss if price falls.',
+    legs:['Sell Call (near)','Buy 2x Call (further OTM)'], theta:'Negative', premium:'Small credit/debit',
+    defaults:{spot:100, legA:{type:'call',side:'sell',strike:100,premium:4.5}, legB:{type:'call',side:'buy',strike:110,premium:1.3,ratio:2}}
+  },
+  {
+    id:'putbackspread', name:'Put Backspread', bias:'neutral', dir:'Long volatility (downside-skewed)',
+    desc:'Sell one put near the money, buy two further OTM puts. Mirror of the call backspread — profits on a sharp drop, small loss if price drifts down slowly, limited loss if price rallies.',
+    legs:['Sell Put (near)','Buy 2x Put (further OTM)'], theta:'Negative', premium:'Small credit/debit',
+    defaults:{spot:100, legA:{type:'put',side:'sell',strike:100,premium:4.2}, legB:{type:'put',side:'buy',strike:90,premium:1.2,ratio:2}}
+  },
+  {
+    id:'ladder', name:'Call Ladder (Christmas Tree)', bias:'neutral', dir:'Range-bound, uncapped tail risk above',
+    desc:'Buy one call, sell one call higher, sell one more call higher still. Profits in a band between the strikes; above the top strike you are net short a call, so loss is uncapped on a strong breakout.',
+    legs:['Buy Call (low)','Sell Call (mid)','Sell Call (high)'], theta:'Positive (until breakout)', premium:'Small debit/credit',
+    defaults:{spot:100, legA:{type:'call',side:'buy',strike:98,premium:5.0}, legB:{type:'call',side:'sell',strike:104,premium:2.3}, legC:{type:'call',side:'sell',strike:112,premium:0.9}}
+  },
+  {
+    id:'reversecondor', name:'Reverse Iron Condor', bias:'neutral', dir:'Breakout / long volatility',
+    desc:'Buy a call spread and a put spread inside two further-out short wings — the mirror image of the iron condor. Costs a net debit; profits if price breaks hard either direction, caps loss if it stays pinned inside.',
+    legs:['Buy Call (inner)','Sell Call (wing)','Buy Put (inner)','Sell Put (wing)'], theta:'Negative', premium:'Debit',
+    defaults:{spot:100, legA:{type:'call',side:'buy',strike:104,premium:2.5}, legB:{type:'call',side:'sell',strike:110,premium:1.0},
+      legC:{type:'put',side:'buy',strike:96,premium:2.3}, legD:{type:'put',side:'sell',strike:90,premium:0.9}}
+  },
+  {
+    id:'guts', name:'Guts (ITM Strangle)', bias:'neutral', dir:'Long volatility (ITM)',
+    desc:'Buy an in-the-money call and an in-the-money put, both struck past the money on their own side. Same payoff shape as a straddle but built from pricier ITM contracts — more intrinsic value cushion, bigger upfront cost.',
+    legs:['Buy ITM Call','Buy ITM Put'], theta:'Negative', premium:'Debit (large)',
+    defaults:{spot:100, legA:{type:'call',side:'buy',strike:94,premium:8.5}, legB:{type:'put',side:'buy',strike:106,premium:8.2}}
   }
 ];
 
@@ -507,7 +538,12 @@ function compute(){
     callratio:'Risk above the short strikes is uncapped, not capped like a condor. A sharp rally through both short calls can produce a loss far bigger than the credit collected.',
     jadelizard:'No upside risk only holds if the total credit collected is at least the width of the call spread — check that before relying on it. Downside risk below the short put is real and uncapped like a naked put.',
     brokenwing:'The wider wing removes risk on one side, but concentrates it on the other — a move through the narrow side can approach max loss faster than a standard butterfly.',
-    box:'Not a volatility or direction trade — it locks in a fixed payoff at the strike width, so the only real variable is whether your net cost is actually cheaper than the financing rate it implies. Check that math before using one.'
+    box:'Not a volatility or direction trade — it locks in a fixed payoff at the strike width, so the only real variable is whether your net cost is actually cheaper than the financing rate it implies. Check that math before using one.',
+    callbackspread:'A slow grind upward is close to the worst case — not a big move either way. Breakeven on the upside can sit further out than it looks; check it against your real target before assuming the "free" long exposure pays off.',
+    putbackspread:'A slow grind downward is close to the worst case — the same way a slow rally hurts the call backspread. Check the downside breakeven against your real target, not just the direction you expect.',
+    ladder:'Looks like easy credit while price sits between the strikes, but above the top strike you are net short a call with no cap. Never run this without knowing exactly where that uncapped zone starts.',
+    reversecondor:'This is a debit paid upfront, and max loss happens if price does nothing and pins between the inner strikes — the opposite failure mode from a regular iron condor. Needs a real move to clear the cost.',
+    guts:'Built from in-the-money options, so the upfront cost is much larger than a straddle at the same strikes\' distance from spot. The breakevens are wider — check the actual dollar cost before assuming this behaves like a cheap straddle.'
   };
   document.getElementById('caution').innerHTML = `<b>Caution —</b> ${cautions[current.id]}`;
 }
@@ -792,7 +828,12 @@ const VSTRATS = [
   {id:'callratio', label:'Call Ratio Spread'},
   {id:'jadelizard', label:'Jade Lizard'},
   {id:'brokenwing', label:'Broken-Wing Butterfly'},
-  {id:'box', label:'Box Spread'}
+  {id:'box', label:'Box Spread'},
+  {id:'callbackspread', label:'Call Backspread'},
+  {id:'putbackspread', label:'Put Backspread'},
+  {id:'ladder', label:'Call Ladder (Christmas Tree)'},
+  {id:'reversecondor', label:'Reverse Iron Condor'},
+  {id:'guts', label:'Guts (ITM Strangle)'}
 ];
 let activeVstrat = 'straddle';
 
@@ -947,6 +988,37 @@ function verdictFor(id, s){
   if(id==='box'){
     return {cls:'caution', label:'CAUTION', reason:`This isn't a volatility or sentiment trade, so none of the signals above apply to it directly. The only question is whether your net cost is cheaper than the implied financing rate (compare it to the ${fundingPct.toFixed(3)}%/8h perp funding rate as a rough proxy) — verify that math yourself before using one.`};
   }
+  if(id==='callbackspread' || id==='putbackspread' || id==='guts'){
+    if(ivPrem < -3 || fngExtreme){
+      const bits=[];
+      if(ivPrem<-3) bits.push('implied vol is running below realized — the long leg(s) you need to buy look cheap relative to recent movement');
+      if(fngExtreme) bits.push(`sentiment is at an extreme (${s.fngLabel}), which raises the odds of the sharp move this structure needs`);
+      return {cls:'go', label:'GO', reason: bits.join('; ')+'.'};
+    }
+    if(ivPrem > 6) return {cls:'avoid', label:'AVOID', reason:`Implied vol is well above realized (+${ivPrem.toFixed(1)} pts) — the long options this structure depends on are expensive relative to what price has actually been doing.`};
+    return {cls:'caution', label:'CAUTION', reason:`IV vs realized is roughly fair (${ivPrem>=0?'+':''}${ivPrem.toFixed(1)} pts) — no strong premium edge either way; remember this still needs a real move to pay off, a flat market is the main loss case.`};
+  }
+  if(id==='reversecondor'){
+    if(ivPrem < -3 || fngExtreme){
+      const bits=[];
+      if(ivPrem<-3) bits.push('implied vol is running below realized — the long wings are cheap relative to recent movement');
+      if(fngExtreme) bits.push(`sentiment is at an extreme (${s.fngLabel}), which raises breakout odds`);
+      return {cls:'go', label:'GO', reason: bits.join('; ')+'.'};
+    }
+    if(ivPrem > 6) return {cls:'avoid', label:'AVOID', reason:`Implied vol is well above realized (+${ivPrem.toFixed(1)} pts) — you'd be paying up for a breakout that hasn't been showing up in actual price action.`};
+    return {cls:'caution', label:'CAUTION', reason:`IV vs realized is roughly fair (${ivPrem>=0?'+':''}${ivPrem.toFixed(1)} pts) — this structure's max loss sits in the middle (price pinned between the inner strikes), so check that zone isn't where price is already sitting.`};
+  }
+  if(id==='ladder'){
+    if(fngExtreme || fundingExtreme || crowded){
+      const bits=[];
+      if(fngExtreme) bits.push(`sentiment extreme (${s.fngLabel})`);
+      if(fundingExtreme) bits.push(`funding stretched (${fundingPct.toFixed(3)}%/8h)`);
+      if(crowded) bits.push(`put/call OI ratio lopsided (${s.pcr.toFixed(2)})`);
+      return {cls:'avoid', label:'AVOID', reason:`${bits.join(' and ')} — this structure is net short above its top strike, exactly where a squeeze would push price, and that side is uncapped.`};
+    }
+    if(ivPrem > 3) return {cls:'go', label:'GO', reason:`Implied vol is running ${ivPrem.toFixed(1)} pts above realized — the short legs are being paid more than recent movement justifies, as long as price stays below the top strike.`};
+    return {cls:'caution', label:'CAUTION', reason:`Premium isn't clearly rich (${ivPrem>=0?'+':''}${ivPrem.toFixed(1)} pts vs realized) to compensate for the uncapped risk above the top strike.`};
+  }
   return {cls:'caution', label:'CAUTION', reason:'No verdict logic defined for this structure yet.'};
 }
 
@@ -1076,7 +1148,7 @@ function renderVerdictContent(){
 document.getElementById('vbRefresh').addEventListener('click', refreshSignals);
 
 /* ---------- Version check / update button ---------- */
-const CURRENT_VERSION = "1.3";
+const CURRENT_VERSION = "1.4";
 let updateAvailable = null; // set to remote version string when a newer one is seen
 
 async function doRefreshData(){
