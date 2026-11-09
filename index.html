@@ -369,11 +369,11 @@ function compute(){
   drawChart(curve, spot, breakevens, minP, maxP);
 
   const cautions = {
-    straddle:'Both legs decay every day you hold them. A move that doesn\\'t clear the combined premium before expiry is a loss even if direction is "right".',
+    straddle:'Both legs decay every day you hold them. A move that doesn\'t clear the combined premium before expiry is a loss even if direction is "right".',
     strangle:'Cheaper entry than a straddle, but the OTM strikes mean an even bigger move is needed — many strangles expire worthless.',
     condor:'Max loss can exceed max profit. A sharp move through either short strike erodes gains fast; this is a range-bound bet, not a hedge against a breakout.',
     butterfly:'Narrow profit zone — a bigger move than you expect, in either direction, turns this into close to max loss quickly.',
-    calendar:'Sensitive to the volatility term structure (front vs back month IV), not just price. A large move away from the strike hurts this even though it\\'s "non-directional" at entry.'
+    calendar:'Sensitive to the volatility term structure (front vs back month IV), not just price. A large move away from the strike hurts this even though it\'s "non-directional" at entry.'
   };
   document.getElementById('caution').innerHTML = `<b>Caution —</b> ${cautions[current.id]}`;
 }
@@ -443,7 +443,7 @@ function renderLivePanel(){
   if(activeAsset==='crypto') return renderCryptoPanel(host);
   if(activeAsset==='forex') return renderForexPanel(host);
   if(activeAsset==='stocks') return renderStubPanel(host,'Stocks','Tradier or Polygon.io','tradier',
-    'Once a key is set, this would call your provider\\'s option-chain endpoint (e.g. Tradier GET /v1/markets/options/chains) for the symbol and expiry you pick, and auto-fill strikes/premiums the same way the Crypto tab does from Deribit. No key is wired in yet — nothing is faked or estimated.');
+    'Once a key is set, this would call your provider\'s option-chain endpoint (e.g. Tradier GET /v1/markets/options/chains) for the symbol and expiry you pick, and auto-fill strikes/premiums the same way the Crypto tab does from Deribit. No key is wired in yet — nothing is faked or estimated.');
   if(activeAsset==='bonds') return renderStubPanel(host,'Bonds','a licensed feed (CME Market Data, dxFeed, etc.)','bonds',
     'Treasury and bond futures options trade on CME and settle through licensed market-data vendors — there is no free public feed. This tab is a placeholder for whichever vendor you eventually connect.');
 }
