@@ -10,8 +10,9 @@
 <style>
 :root{
   color-scheme:dark;
-  --bg:#0b0f14; --surface:#121820; --surface2:#18212b; --line:#243040;
-  --fg:#d6dee9; --muted:#8393a7; --accent:#b84dff; --accent-fg:#180a24;
+  --bg:#0c0a12; --surface:#17141f; --surface2:#1e1a29; --line:#332c42;
+  --fg:#e7e4ee; --muted:#a9adbd; --accent:#a855f7; --accent2:#e2995f; --accent-fg:#1a0a24;
+  --silver:#c7ccd6;
   --up:#2fbf71; --down:#f0616d; --warn:#e3b341; --shadow:0 10px 30px rgba(0,0,0,.5);
   --sans:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
   --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
@@ -31,7 +32,7 @@ a{color:var(--accent)}
 header.top{position:sticky;top:0;z-index:20;background:rgba(11,15,20,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
 .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 0}
 .brand{display:flex;align-items:center;gap:10px}
-.brand .mark{width:30px;height:30px;border-radius:7px;background:linear-gradient(135deg,var(--accent),#2fbf71);display:flex;align-items:center;justify-content:center;font-weight:700;color:#180a24;font-family:var(--mono);font-size:14px}
+.brand .mark{width:30px;height:30px;border-radius:7px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-weight:700;color:#1a0a24;font-family:var(--mono);font-size:14px}
 .brand h1{font-size:15px;font-weight:600;letter-spacing:.04em}
 .brand .sub{color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.08em}
 nav.links{display:flex;gap:18px;font-size:13px}
@@ -44,7 +45,7 @@ nav.links a:hover{color:var(--fg)}
 .hero{padding:64px 0 48px;border-bottom:1px solid var(--line)}
 .hero .eyebrow{font:600 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:14px}
 .hero h2{font-size:clamp(28px,5vw,44px);font-weight:700;letter-spacing:-.01em;line-height:1.1;max-width:780px}
-.hero h2 em{font-style:normal;color:var(--accent)}
+.hero h2 em{font-style:normal;background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
 .hero p.lead{margin-top:16px;max-width:620px;color:var(--muted);font-size:15.5px;line-height:1.6}
 .hero .cta{display:flex;gap:10px;margin-top:26px;flex-wrap:wrap}
 .btn{border:1px solid var(--line);background:var(--surface);padding:10px 18px;border-radius:7px;cursor:pointer;font-size:13.5px;text-decoration:none;color:var(--fg);display:inline-flex;align-items:center;gap:8px}
@@ -52,7 +53,7 @@ nav.links a:hover{color:var(--fg)}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg);font-weight:600}
 .hero .stats{display:flex;gap:28px;margin-top:40px;flex-wrap:wrap}
 .hero .stat small{display:block;color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px}
-.hero .stat b{font-family:var(--mono);font-size:19px}
+.hero .stat b{font-family:var(--mono);font-size:19px;color:var(--silver)}
 
 /* section shell */
 section{padding:56px 0;border-bottom:1px solid var(--line)}
@@ -282,6 +283,50 @@ const STRATEGIES = [
     desc:'Sell a near-dated ATM option, buy a longer-dated ATM option at the same strike. Profits if price stays near the strike as the front leg decays faster than the back leg.',
     legs:['Sell Near-dated Call','Buy Far-dated Call'], theta:'Positive (net)', premium:'Debit',
     defaults:{spot:100, legA:{type:'call',side:'sell',strike:100,premium:3.0}, legB:{type:'call',side:'buy',strike:100,premium:5.2}}
+  },
+  {
+    id:'diagonal', name:'Diagonal Spread', bias:'neutral', dir:'Time / mild directional tilt',
+    desc:'Like a calendar, but the far-dated leg sits at a different strike. Still collects time decay on the near leg, with a slight directional lean toward the far strike.',
+    legs:['Sell Near-dated Call','Buy Far-dated Call (diff. strike)'], theta:'Positive (net)', premium:'Debit',
+    defaults:{spot:100, legA:{type:'call',side:'sell',strike:100,premium:3.0}, legB:{type:'call',side:'buy',strike:106,premium:3.4}}
+  },
+  {
+    id:'doublecalendar', name:'Double Calendar', bias:'neutral', dir:'Time / volatility term structure',
+    desc:'Two calendars at once — a put calendar below spot, a call calendar above. Widens the "stay inside this zone" profit area compared to a single calendar.',
+    legs:['Sell Near Put','Buy Far Put','Sell Near Call','Buy Far Call'], theta:'Positive (net)', premium:'Debit',
+    defaults:{spot:100, legA:{type:'put',side:'sell',strike:94,premium:2.0}, legB:{type:'put',side:'buy',strike:94,premium:3.0},
+      legC:{type:'call',side:'sell',strike:106,premium:2.1}, legD:{type:'call',side:'buy',strike:106,premium:3.1}}
+  },
+  {
+    id:'putratio', name:'Put Ratio Spread', bias:'neutral', dir:'Range-bound, uncapped tail risk',
+    desc:'Buy one put, sell two further OTM puts for a net credit. Profits in a range, but risk below the short strikes is uncapped — materially riskier than an iron condor.',
+    legs:['Buy Put','Sell 2x Put (further OTM)'], theta:'Positive', premium:'Credit',
+    defaults:{spot:100, legA:{type:'put',side:'buy',strike:98,premium:2.0}, legB:{type:'put',side:'sell',strike:90,premium:1.3,ratio:2}}
+  },
+  {
+    id:'callratio', name:'Call Ratio Spread', bias:'neutral', dir:'Range-bound, uncapped tail risk',
+    desc:'Buy one call, sell two further OTM calls for a net credit. Mirror of the put ratio spread — uncapped risk above the short strikes.',
+    legs:['Buy Call','Sell 2x Call (further OTM)'], theta:'Positive', premium:'Credit',
+    defaults:{spot:100, legA:{type:'call',side:'buy',strike:102,premium:2.0}, legB:{type:'call',side:'sell',strike:110,premium:1.3,ratio:2}}
+  },
+  {
+    id:'jadelizard', name:'Jade Lizard', bias:'neutral', dir:'Range-bound / short volatility',
+    desc:'Short put + short call spread. No risk on the upside by construction (credit collected ≥ call spread width) — but downside risk remains, same as a naked short put.',
+    legs:['Sell Put','Sell Call','Buy Call (wing)'], theta:'Positive', premium:'Credit',
+    defaults:{spot:100, legA:{type:'put',side:'sell',strike:92,premium:2.2}, legB:{type:'call',side:'sell',strike:108,premium:1.3}, legC:{type:'call',side:'buy',strike:114,premium:0.5}}
+  },
+  {
+    id:'brokenwing', name:'Broken-Wing Butterfly', bias:'neutral', dir:'Pinned, asymmetric risk',
+    desc:'An iron butterfly with one wing wider than the other. Shifts risk so one side costs little or nothing — at the cost of a bigger loss if price breaks the other way.',
+    legs:['Buy Call (near wing)','Sell 2x Call (body)','Buy Call (far wing)'], theta:'Positive', premium:'Credit/Debit',
+    defaults:{spot:100, legA:{type:'call',side:'buy',strike:96,premium:6.0}, legB:{type:'call',side:'sell',strike:102,premium:3.0,ratio:2}, legC:{type:'call',side:'buy',strike:112,premium:0.6}}
+  },
+  {
+    id:'box', name:'Box Spread', bias:'neutral', dir:'Arbitrage / synthetic financing',
+    desc:'Buy a call spread and the matching put spread at the same two strikes. The payoff is locked at the strike width regardless of price — this is a financing construction, not a volatility or direction bet.',
+    legs:['Buy Call K1','Sell Call K2','Sell Put K1','Buy Put K2'], theta:'Flat', premium:'Debit',
+    defaults:{spot:100, legA:{type:'call',side:'buy',strike:98,premium:5.0}, legB:{type:'call',side:'sell',strike:102,premium:2.2},
+      legC:{type:'put',side:'sell',strike:98,premium:1.9}, legD:{type:'put',side:'buy',strike:102,premium:4.6}}
   }
 ];
 
@@ -293,7 +338,7 @@ function renderCards(){
   const grid = document.getElementById('sgrid');
   grid.innerHTML = STRATEGIES.map(s=>`
     <div class="scard ${s.id===current.id?'on':''}" data-id="${s.id}">
-      <div class="stop"><h4>${s.name}</h4><span class="bias neutral">${s.theta.includes('Negative')?'Long Vol':'Short Vol'}</span></div>
+      <div class="stop"><h4>${s.name}</h4><span class="bias neutral">${s.theta.includes('Negative')?'Long Vol':(s.theta.includes('Positive')?'Short Vol':'Flat / Arb')}</span></div>
       <p>${s.desc}</p>
       <div class="legs">${s.legs.map(l=>`<span>${l}</span>`).join('')}</div>
       <div class="meta"><span>${s.premium}</span><span>Theta: ${s.theta}</span></div>
@@ -310,11 +355,12 @@ function legField(key,label,leg){
   if(!leg) return '';
   return `
   <div class="legrow" data-leg="${key}">
-    <div class="lh"><span>${label}</span><span>${leg.type.toUpperCase()} · ${leg.side.toUpperCase()}</span></div>
+    <div class="lh"><span>${label}</span><span>${leg.type.toUpperCase()} · ${leg.side.toUpperCase()}${leg.ratio&&leg.ratio!==1?' · x'+leg.ratio:''}</span></div>
     <div class="row2">
       <div class="field"><label>Strike</label><input type="number" step="0.01" class="strike" value="${leg.strike}"></div>
       <div class="field"><label>Premium</label><input type="number" step="0.01" class="premium" value="${leg.premium}"></div>
     </div>
+    <div class="field"><label>Qty (ratio)</label><input type="number" step="1" min="1" class="ratio" value="${leg.ratio||1}"></div>
   </div>`;
 }
 
@@ -344,7 +390,8 @@ function getLegs(){
     const row = document.querySelector(`.legrow[data-leg="${key}"]`);
     const strike = parseFloat(row.querySelector('.strike').value)||0;
     const premium = parseFloat(row.querySelector('.premium').value)||0;
-    legs.push({type:d[key].type, side:d[key].side, strike, premium});
+    const ratio = parseFloat(row.querySelector('.ratio').value)||1;
+    legs.push({type:d[key].type, side:d[key].side, strike, premium, ratio});
   });
   return legs;
 }
@@ -353,7 +400,7 @@ function legPnl(leg, price){
   const intrinsic = leg.type==='call' ? Math.max(price-leg.strike,0) : Math.max(leg.strike-price,0);
   const sign = leg.side==='buy' ? 1 : -1;
   const cost = leg.side==='buy' ? -leg.premium : leg.premium;
-  return sign*intrinsic + cost;
+  return (sign*intrinsic + cost) * (leg.ratio||1);
 }
 
 function totalPnl(legs, price, qty, mult){
@@ -407,7 +454,14 @@ function compute(){
     strangle:'Cheaper entry than a straddle, but the OTM strikes mean an even bigger move is needed — many strangles expire worthless.',
     condor:'Max loss can exceed max profit. A sharp move through either short strike erodes gains fast; this is a range-bound bet, not a hedge against a breakout.',
     butterfly:'Narrow profit zone — a bigger move than you expect, in either direction, turns this into close to max loss quickly.',
-    calendar:'Sensitive to the volatility term structure (front vs back month IV), not just price. A large move away from the strike hurts this even though it\'s "non-directional" at entry.'
+    calendar:'Sensitive to the volatility term structure (front vs back month IV), not just price. A large move away from the strike hurts this even though it\'s "non-directional" at entry.',
+    diagonal:'The different strikes mean this isn\'t purely time-driven — a big move toward or away from the far strike changes the P&L more than a standard calendar would.',
+    doublecalendar:'Two calendars means two sets of term-structure risk. A move that clears either zone before the near legs expire can erode both sides at once.',
+    putratio:'Risk below the short strikes is uncapped, not capped like a condor. A sharp drop through both short puts can produce a loss far bigger than the credit collected.',
+    callratio:'Risk above the short strikes is uncapped, not capped like a condor. A sharp rally through both short calls can produce a loss far bigger than the credit collected.',
+    jadelizard:'No upside risk only holds if the total credit collected is at least the width of the call spread — check that before relying on it. Downside risk below the short put is real and uncapped like a naked put.',
+    brokenwing:'The wider wing removes risk on one side, but concentrates it on the other — a move through the narrow side can approach max loss faster than a standard butterfly.',
+    box:'Not a volatility or direction trade — it locks in a fixed payoff at the strike width, so the only real variable is whether your net cost is actually cheaper than the financing rate it implies. Check that math before using one.'
   };
   document.getElementById('caution').innerHTML = `<b>Caution —</b> ${cautions[current.id]}`;
 }
@@ -436,10 +490,10 @@ function drawChart(curve, spot, breakevens, minP, maxP){
     <rect x="0" y="0" width="${W}" height="${H}" fill="none"/>
     ${gridlines.join('')}
     <line x1="${ML}" y1="${zeroY}" x2="${W-MR}" y2="${zeroY}" stroke="#8393a7" stroke-width="1" stroke-dasharray="3,3"/>
-    <line x1="${X(spot).toFixed(1)}" y1="${MT}" x2="${X(spot).toFixed(1)}" y2="${MT+plotH}" stroke="#b84dff" stroke-width="1" stroke-dasharray="2,2"/>
-    <text x="${X(spot).toFixed(1)}" y="${MT-6}" fill="#b84dff" font-size="10" font-family="IBM Plex Mono,monospace" text-anchor="middle">spot</text>
+    <line x1="${X(spot).toFixed(1)}" y1="${MT}" x2="${X(spot).toFixed(1)}" y2="${MT+plotH}" stroke="#a855f7" stroke-width="1" stroke-dasharray="2,2"/>
+    <text x="${X(spot).toFixed(1)}" y="${MT-6}" fill="#a855f7" font-size="10" font-family="IBM Plex Mono,monospace" text-anchor="middle">spot</text>
     <path d="${path}" fill="none" stroke="#2fbf71" stroke-width="2.2"/>
-    ${breakevens.map(b=>`<circle cx="${X(b).toFixed(1)}" cy="${zeroY.toFixed(1)}" r="4" fill="#e3b341"/>`).join('')}
+    ${breakevens.map(b=>`<circle cx="${X(b).toFixed(1)}" cy="${zeroY.toFixed(1)}" r="4" fill="#e2995f"/>`).join('')}
   `;
 }
 
@@ -683,7 +737,16 @@ const VSTRATS = [
   {id:'straddle', label:'Straddle'},
   {id:'strangle', label:'Strangle'},
   {id:'condor', label:'Iron Condor'},
-  {id:'deltaneutral', label:'Delta-Neutral / Hedged'}
+  {id:'deltaneutral', label:'Delta-Neutral / Hedged'},
+  {id:'butterfly', label:'Iron Butterfly'},
+  {id:'calendar', label:'Calendar Spread'},
+  {id:'diagonal', label:'Diagonal Spread'},
+  {id:'doublecalendar', label:'Double Calendar'},
+  {id:'putratio', label:'Put Ratio Spread'},
+  {id:'callratio', label:'Call Ratio Spread'},
+  {id:'jadelizard', label:'Jade Lizard'},
+  {id:'brokenwing', label:'Broken-Wing Butterfly'},
+  {id:'box', label:'Box Spread'}
 ];
 let activeVstrat = 'straddle';
 
@@ -767,10 +830,36 @@ function verdictFor(id, s){
     if(ivPrem > 3) return {cls:'go', label:'GO', reason:`Implied vol is running ${ivPrem.toFixed(1)} pts above realized — selling premium is being paid more than recent movement justifies.`};
     return {cls:'caution', label:'CAUTION', reason:`Premium isn't clearly rich (${ivPrem>=0?'+':''}${ivPrem.toFixed(1)} pts vs realized) — size down or wait for a better credit.`};
   }
-  // delta-neutral / hedged
-  if(s.realizedVol > s.markIv) return {cls:'go', label:'GO', reason:`Realized vol (${s.realizedVol.toFixed(1)}%) is outrunning implied (${s.markIv.toFixed(1)}%) — more actual movement to rebalance against than you're paying in premium.`};
-  if(fundingExtreme) return {cls:'caution', label:'CAUTION', reason:`Funding is stretched (${fundingPct.toFixed(3)}%/8h) — a hedged book still needs active risk management here, not a free ride.`};
-  return {cls:'caution', label:'CAUTION', reason:`Low realized vol (${s.realizedVol.toFixed(1)}%) means thinner gamma-scalping opportunity — mostly a theta/funding carry environment right now.`};
+  if(id==='deltaneutral'){
+    if(s.realizedVol > s.markIv) return {cls:'go', label:'GO', reason:`Realized vol (${s.realizedVol.toFixed(1)}%) is outrunning implied (${s.markIv.toFixed(1)}%) — more actual movement to rebalance against than you're paying in premium.`};
+    if(fundingExtreme) return {cls:'caution', label:'CAUTION', reason:`Funding is stretched (${fundingPct.toFixed(3)}%/8h) — a hedged book still needs active risk management here, not a free ride.`};
+    return {cls:'caution', label:'CAUTION', reason:`Low realized vol (${s.realizedVol.toFixed(1)}%) means thinner gamma-scalping opportunity — mostly a theta/funding carry environment right now.`};
+  }
+  if(id==='butterfly' || id==='brokenwing'){
+    if(fngExtreme || fundingExtreme) return {cls:'avoid', label:'AVOID', reason:`${fngExtreme?`Sentiment extreme (${s.fngLabel})`:''}${fngExtreme&&fundingExtreme?' and ':''}${fundingExtreme?`funding stretched (${fundingPct.toFixed(3)}%/8h)`:''} — this structure's profit zone is narrower than a condor's, so it tolerates a breakout even worse.`};
+    if(ivPrem > 2) return {cls:'go', label:'GO', reason:`Implied vol is ${ivPrem.toFixed(1)} pts above realized — a pinned, premium-selling structure is being paid fairly for a quiet market that's actually showing up.`};
+    return {cls:'caution', label:'CAUTION', reason:`IV premium isn't clearly rich (${ivPrem>=0?'+':''}${ivPrem.toFixed(1)} pts) for how narrow this structure's profit zone is.`};
+  }
+  if(id==='calendar' || id==='diagonal' || id==='doublecalendar'){
+    if(fngExtreme) return {cls:'avoid', label:'AVOID', reason:`Sentiment is at an extreme (${s.fngLabel}) — a sharp move away from the strike(s) hurts a time-decay structure more than it helps.`};
+    if(ivPrem < 0) return {cls:'go', label:'GO', reason:`Implied vol is at or below realized (${ivPrem.toFixed(1)} pts) — the far-dated leg you're buying isn't overpriced relative to actual movement.`};
+    if(ivPrem > 6) return {cls:'avoid', label:'AVOID', reason:`Implied vol is well above realized (+${ivPrem.toFixed(1)} pts) — the far-dated leg you're buying is expensive relative to what price has actually been doing.`};
+    return {cls:'caution', label:'CAUTION', reason:`IV vs realized is roughly fair (${ivPrem>=0?'+':''}${ivPrem.toFixed(1)} pts) — edge depends more on the term-structure shape than this spot check alone.`};
+  }
+  if(id==='putratio' || id==='callratio'){
+    if(fngExtreme || fundingExtreme) return {cls:'avoid', label:'AVOID', reason:`${fngExtreme?`Sentiment extreme (${s.fngLabel})`:''}${fngExtreme&&fundingExtreme?' and ':''}${fundingExtreme?`funding stretched (${fundingPct.toFixed(3)}%/8h)`:''} — the uncapped side of this structure is exactly the side a squeeze would hit.`};
+    if(ivPrem > 4) return {cls:'go', label:'GO', reason:`Implied vol is ${ivPrem.toFixed(1)} pts above realized — worth collecting, but remember the short side here is uncapped, unlike a condor.`};
+    return {cls:'caution', label:'CAUTION', reason:`Premium isn't clearly rich enough (${ivPrem>=0?'+':''}${ivPrem.toFixed(1)} pts) to justify taking on uncapped tail risk for this credit.`};
+  }
+  if(id==='jadelizard'){
+    if(s.funding8h!=null && s.funding8h < -0.0005) return {cls:'avoid', label:'AVOID', reason:`Funding is negative and stretched (${fundingPct.toFixed(3)}%/8h) — shorts are crowded, which raises the odds of a downside move hitting the uncapped short put.`};
+    if(ivPrem > 3 && !fngExtreme) return {cls:'go', label:'GO', reason:`Implied vol is ${ivPrem.toFixed(1)} pts above realized with no sentiment extreme — decent credit for a structure with no upside risk by construction.`};
+    return {cls:'caution', label:'CAUTION', reason:`Check that your total credit actually exceeds the call-spread width before relying on "no upside risk" — the math isn't guaranteed by the structure's name alone.`};
+  }
+  if(id==='box'){
+    return {cls:'caution', label:'CAUTION', reason:`This isn't a volatility or sentiment trade, so none of the signals above apply to it directly. The only question is whether your net cost is cheaper than the implied financing rate (compare it to the ${fundingPct.toFixed(3)}%/8h perp funding rate as a rough proxy) — verify that math yourself before using one.`};
+  }
+  return {cls:'caution', label:'CAUTION', reason:'No verdict logic defined for this structure yet.'};
 }
 
 function renderVerdictMenu(){
