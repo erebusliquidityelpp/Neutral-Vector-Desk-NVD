@@ -158,6 +158,41 @@ table.vtab td:last-child{text-align:right;font-weight:600}
 .gloss dd{margin:0;color:var(--muted);padding-top:8px;border-top:1px dashed var(--line)}
 .gloss dt:first-of-type,.gloss dd:first-of-type{border-top:0;padding-top:0}
 
+.acsub{border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:16px;margin-bottom:18px}
+.acsub h4{margin:0 0 4px;font-size:15px}
+.acsub .acnote{font-size:12.5px;color:var(--muted);margin:0 0 12px;line-height:1.5}
+.steplist{display:flex;flex-direction:column;gap:10px;counter-reset:step}
+.stepit{display:flex;gap:12px;align-items:flex-start;border-top:1px dashed var(--line);padding-top:10px}
+.stepit:first-child{border-top:0;padding-top:0}
+.stepit .sno{counter-increment:step;flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:var(--surface2);border:1px solid var(--line);color:var(--accent2);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.stepit .sno::before{content:counter(step)}
+.stepit .stxt b{display:block;font-size:13px;margin-bottom:2px}
+.stepit .stxt span{font-size:12.5px;color:var(--muted);line-height:1.5}
+.threshtbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.threshtbl th{text-align:left;color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;padding:6px 8px;border-bottom:1px solid var(--line)}
+.threshtbl td{padding:7px 8px;border-bottom:1px dashed var(--line);vertical-align:top}
+.threshtbl td.mono{font-family:var(--mono);color:var(--accent2);white-space:nowrap}
+.acgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
+.acc{border:1px solid var(--line);border-radius:10px;background:var(--surface2);overflow:hidden}
+.acc summary{cursor:pointer;padding:10px 12px;font-size:13px;font-weight:600;display:flex;justify-content:space-between;align-items:center;gap:8px;list-style:none}
+.acc summary::-webkit-details-marker{display:none}
+.acc summary::after{content:'+';color:var(--muted);font-weight:400}
+.acc[open] summary::after{content:'–'}
+.acc .accbody{padding:0 12px 12px;font-size:12.5px;color:var(--muted);line-height:1.55}
+.acc .accbody .legs{margin-top:6px;font-family:var(--mono);font-size:11.5px;color:var(--fg)}
+
+.radargrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:14px}
+.radarcard{border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:10px 12px}
+.radarcard small{display:block;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+.radarcard b{font-family:var(--mono);font-size:16px}
+.radarcard .tag{display:inline-block;margin-top:4px;font-size:10.5px;padding:2px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.radarcard .tag.rich,.radarcard .tag.extreme,.radarcard .tag.lopsided,.radarcard .tag.stretched{color:var(--down);border-color:var(--down)}
+.radarcard .tag.cheap,.radarcard .tag.calm{color:var(--up);border-color:var(--up)}
+.radarverdict{border:1px solid var(--accent);border-radius:12px;background:var(--surface2);padding:16px}
+.radarverdict h4{margin:0 0 8px;font-size:14px;display:flex;align-items:center;gap:8px}
+.radarverdict ul{margin:8px 0 0;padding-left:18px;font-size:12.5px;color:var(--muted);line-height:1.6}
+.radarempty{font-size:12.5px;color:var(--muted);padding:20px;text-align:center;border:1px dashed var(--line);border-radius:10px}
+
 footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
 </style>
 </head>
@@ -190,9 +225,10 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
       <a href="#strategies">Strategies</a>
       <a href="#builder">Builder</a>
       <a href="#watchlist">Watchlist</a>
-      <a href="#glossary">Glossary</a>
+      <a href="#radar">Prediction Radar</a>
+      <a href="#academy">Vocabulary &amp; Academy</a>
     </nav>
-    <span class="chip verchip" id="verChip">v1.4</span>
+    <span class="chip verchip" id="verChip">v1.5</span>
     <button class="btn sm" id="globalRefresh">⟳ Refresh</button>
     <span class="chip"><span class="dot"></span> Client-side · no stored data</span>
   </div>
@@ -272,22 +308,103 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
   </div>
 </section>
 
-<section id="glossary">
+<section id="radar">
   <div class="wrap">
     <div class="shead">
-      <div class="kicker">Glossary</div>
-      <h3 class="stitle">Terms used on this desk</h3>
+      <div class="kicker">Prediction Radar</div>
+      <h3 class="stitle">What the scanner sees, in one place</h3>
+      <p class="sdesc">Every raw number the live feeds returned, side by side, plus the desk's own synthesized read on the market — the reasoning the per-strategy verdicts are each built from, laid out as a single call with its "why".</p>
     </div>
-    <dl class="gloss">
-      <dt>OTM (out-of-the-money)</dt><dd>A call with a strike above current price, or a put with a strike below it. No intrinsic value yet — the premium is pure time/volatility value, which is why OTM options are cheaper and need a bigger move to pay off.</dd>
-      <dt>ITM (in-the-money)</dt><dd>A call with a strike below current price, or a put above it. Already has intrinsic value, so it costs more and moves closer to 1:1 with the underlying.</dd>
-      <dt>ATM (at-the-money)</dt><dd>Strike approximately equal to current price. Maximum time value, maximum sensitivity to a move in either direction — the typical straddle strike.</dd>
-      <dt>Breakeven</dt><dd>The underlying price at expiry where the structure's P&L crosses zero. Debit structures (straddle, strangle) usually have two breakevens; credit structures (iron condor) also have two, marking the edges of the profit zone.</dd>
-      <dt>Max profit / max loss</dt><dd>The best and worst outcomes the structure can produce at expiry, given the strikes and premiums you entered. For defined-risk structures both are capped; for long straddles/strangles max loss is capped at premium paid but max profit is theoretically open.</dd>
-      <dt>Theta (time decay)</dt><dd>How much an option's value erodes per day, all else equal. Long premium structures (straddle, strangle) bleed theta; short premium structures (iron condor) collect it.</dd>
-      <dt>Delta-neutral</dt><dd>A combined position whose net directional sensitivity is approximately zero. Institutional desks build and continuously rebalance delta-neutral books; this builder gives you a static snapshot at entry, not a rebalancing engine.</dd>
-      <dt>Implied volatility (IV)</dt><dd>The market's priced-in expectation of future movement, baked into the option's premium. Non-directional structures are really trades on whether realized movement comes in above or below what IV implied.</dd>
-    </dl>
+    <div id="radarHost"></div>
+  </div>
+</section>
+
+<section id="academy">
+  <div class="wrap">
+    <div class="shead">
+      <div class="kicker">Vocabulary &amp; Academy</div>
+      <h3 class="stitle">Everything the desk assumes you already know</h3>
+      <p class="sdesc">Terms, abbreviations, the exact thresholds the verdict engine uses, how to read a signal, and the step-by-step process for taking a trade off this desk.</p>
+    </div>
+
+    <div class="acsub">
+      <h4>1. Terms &amp; abbreviations</h4>
+      <p class="acnote">What every label on this site actually means.</p>
+      <dl class="gloss">
+        <dt>OTM (out-of-the-money)</dt><dd>A call with a strike above current price, or a put with a strike below it. No intrinsic value yet — the premium is pure time/volatility value, which is why OTM options are cheaper and need a bigger move to pay off.</dd>
+        <dt>ITM (in-the-money)</dt><dd>A call with a strike below current price, or a put above it. Already has intrinsic value, so it costs more and moves closer to 1:1 with the underlying.</dd>
+        <dt>ATM (at-the-money)</dt><dd>Strike approximately equal to current price. Maximum time value, maximum sensitivity to a move in either direction — the typical straddle strike.</dd>
+        <dt>Breakeven</dt><dd>The underlying price at expiry where the structure's P&amp;L crosses zero. Debit structures (straddle, strangle) usually have two breakevens; credit structures (iron condor) also have two, marking the edges of the profit zone.</dd>
+        <dt>Max profit / max loss</dt><dd>The best and worst outcomes the structure can produce at expiry, given the strikes and premiums you entered. For defined-risk structures both are capped; for long straddles/strangles max loss is capped at premium paid but max profit is theoretically open. "Uncapped" means the model has no ceiling to show you — treat it as large, not infinite in practice.</dd>
+        <dt>Net debit / net credit</dt><dd>Debit = you pay to open (buying costs more than what you sold). Credit = you collect to open (selling brings in more than what you bought). Shown under "Net debit/credit" in the builder results.</dd>
+        <dt>Qty (ratio)</dt><dd>How many contracts of that specific leg relative to the others — e.g. a ratio spread sells 2 contracts for every 1 it buys. This is per-leg, not the overall position size.</dd>
+        <dt>Multiplier</dt><dd>Contract size. Crypto options on Deribit are 1 coin per contract (multiplier 1); equity options are typically 100 shares per contract (multiplier 100). Get this wrong and every dollar figure in the builder is wrong by that factor.</dd>
+        <dt>Theta (time decay)</dt><dd>How much an option's value erodes per day, all else equal. Long premium structures (straddle, strangle, backspreads, guts) bleed theta — that's the "Long Vol" badge. Short premium structures (condor, butterfly, calendars, ratio spreads, ladder) collect it — the "Short Vol" badge. "Flat" (box spread) means theta is a side-effect, not the point.</dd>
+        <dt>Delta-neutral</dt><dd>A combined position whose net directional sensitivity is approximately zero. Institutional desks build and continuously rebalance delta-neutral books; this builder gives you a static snapshot at entry, not a rebalancing engine.</dd>
+        <dt>Implied volatility (IV)</dt><dd>The market's priced-in expectation of future movement, baked into the option's premium right now. Read off Deribit's at-the-money, nearest-expiry option via <code>mark_iv</code>.</dd>
+        <dt>Realized volatility (RV)</dt><dd>How much the underlying has actually moved recently (Deribit's own historical volatility series). The whole "cheap vs rich premium" read is just IV minus RV.</dd>
+        <dt>IV − RV spread ("vol premium")</dt><dd>Implied minus realized, in volatility points. Positive means the market is pricing in more movement than has actually been happening (premium looks rich — favors selling it). Negative means implied is running below what's actually occurring (premium looks cheap — favors buying it).</dd>
+        <dt>Funding rate</dt><dd>The periodic payment perpetual-futures longs and shorts make to each other, here read every 8 hours. Persistently positive = longs paying shorts (crowd leaning long); persistently negative = the reverse. Used here only as a crowding/stretch signal, not a funding-carry trade.</dd>
+        <dt>Fear &amp; Greed Index (FNG)</dt><dd>A 0–100 sentiment score (alternative.me). Low = fear, high = greed. Extremes in either direction (≤20 or ≥80) are read here as "more likely to produce a sharp move," which cuts for long-vol structures and against pinned/range structures.</dd>
+        <dt>Put/Call OI ratio (PCR)</dt><dd>Total open interest in puts divided by total open interest in calls, across the option chain (Deribit <code>get_book_summary_by_currency</code>). Near 1.0 is balanced positioning. Well above 1 means puts are crowded (downside hedging/betting dominant); well below means calls are crowded.</dd>
+        <dt>IV skew (put − call)</dt><dd>Average implied vol of puts minus average implied vol of calls across the chain. Positive skew (puts pricier) is the normal/defensive state in most markets; a flip or a big widening is itself informative about which side is paying up for protection.</dd>
+        <dt>Total option OI</dt><dd>Total open contracts across the whole chain — a rough proxy for how much size and liquidity is actually sitting in the options market right now, separate from direction.</dd>
+        <dt>BTC mempool congestion</dt><dd>Unconfirmed-transaction backlog and the fastest recommended fee on the Bitcoin network (mempool.space). Shown only for BTC — a crude on-chain activity/urgency gauge, nothing more.</dd>
+        <dt>BTC dominance</dt><dd>Bitcoin's share of total crypto market cap (CoinGecko). Rising dominance usually means capital rotating toward BTC and away from alts (risk-off within crypto); falling dominance usually means the opposite.</dd>
+        <dt>GO / CAUTION / AVOID</dt><dd>The desk's shorthand verdict per structure. GO = the live signals line up with what that structure needs to work. CAUTION = no strong edge either way — the math still works, but nothing above is doing you a favor. AVOID = the live signals are actively working against this specific structure's weak point.</dd>
+        <dt>"Crowded" positioning</dt><dd>This desk's label for PCR above 1.3 or below 0.6 — positioning lopsided enough that a squeeze back the other way is a real risk, which is specifically bad for anything short premium with a tail (condor, butterfly, ratio spreads, ladder).</dd>
+      </dl>
+    </div>
+
+    <div class="acsub">
+      <h4>2. Exact thresholds the verdict engine uses</h4>
+      <p class="acnote">No hidden math — this is every number <code>verdictFor()</code> actually checks, so you can judge the call yourself instead of taking the pill color on faith.</p>
+      <table class="threshtbl">
+        <tr><th>Signal</th><th>Threshold</th><th>What it flags</th></tr>
+        <tr><td>IV − RV spread</td><td class="mono">&lt; −3 pts</td><td>Premium looks cheap → favors buying volatility (straddle, strangle, backspreads, guts, reverse condor)</td></tr>
+        <tr><td>IV − RV spread</td><td class="mono">&gt; +6 pts</td><td>Premium looks rich enough that buying it is a weak bet → AVOID on long-vol structures</td></tr>
+        <tr><td>IV − RV spread (short-vol side)</td><td class="mono">&gt; +3 pts</td><td>Premium looks rich enough to sell → favors condor, ratio spreads, ladder</td></tr>
+        <tr><td>IV − RV spread (pinned structures)</td><td class="mono">&gt; +2 pts</td><td>Same idea, tighter bar for the narrower butterfly / broken-wing profit zone</td></tr>
+        <tr><td>Funding rate (8h)</td><td class="mono">|funding| &gt; 0.05%</td><td>"Stretched" — one side of the perp market is crowded and paying up for it</td></tr>
+        <tr><td>Fear &amp; Greed</td><td class="mono">≤20 or ≥80</td><td>Sentiment extreme — raises odds of a sharp move either way</td></tr>
+        <tr><td>Put/Call OI ratio</td><td class="mono">&gt;1.3 or &lt;0.6</td><td>"Crowded" positioning — raises squeeze risk against short-premium, capped-zone structures</td></tr>
+        <tr><td>Jade Lizard funding gate</td><td class="mono">funding &lt; −0.05%</td><td>Shorts crowded → raises odds of the exact downside move that hurts the uncapped short put</td></tr>
+      </table>
+    </div>
+
+    <div class="acsub">
+      <h4>3. How to actually read a signal, in plain terms</h4>
+      <div class="acgrid">
+        <div class="acc"><details><summary>IV is above realized vol — what do I do with that?</summary><div class="accbody">Options are pricing in more movement than has actually been happening. That's good for strategies that sell premium (condor, butterfly, calendars, ratio spreads, ladder) and bad for strategies that buy it (straddle, strangle, backspreads, guts) — you'd be overpaying for movement that hasn't shown up yet.</div></details></div>
+        <div class="acc"><details><summary>IV is below realized vol — what do I do with that?</summary><div class="accbody">The reverse: options are cheap relative to what's actually been moving. Favors buying premium (straddle, strangle, backspreads, guts, reverse condor) and is a weaker setup for selling it, since you'd be collecting less than the recent movement would justify.</div></details></div>
+        <div class="acc"><details><summary>Fear &amp; Greed is at an extreme — what does that change?</summary><div class="accbody">Extremes (fear or greed) have historically preceded sharper reversals or continuation moves than a neutral reading. That raises the odds a big-move (long-vol) structure gets paid, and raises the odds a pinned/range (short-vol) structure gets run over.</div></details></div>
+        <div class="acc"><details><summary>Funding is stretched positive — what does that mean?</summary><div class="accbody">Longs are paying shorts a lot to stay long — the perp market is crowded long. That's a classic setup for a long squeeze (sharp move down as crowded longs get flushed), which cuts against range-bound, short-premium structures on their downside.</div></details></div>
+        <div class="acc"><details><summary>Funding is stretched negative — what does that mean?</summary><div class="accbody">The mirror case — shorts are crowded and paying longs. Raises the odds of a short squeeze (sharp move up), which is exactly what hurts an uncapped short call (call ratio spread, call side of a ladder) the most.</div></details></div>
+        <div class="acc"><details><summary>Put/Call OI ratio is lopsided — what does that mean?</summary><div class="accbody">Open interest is piled heavily on one side of the chain. That's positioning, not price — it doesn't say which way price goes, only that a move against the crowded side would be sharper than usual because of forced unwinding. Treated here purely as a risk flag on short-premium, capped-zone structures.</div></details></div>
+        <div class="acc"><details><summary>Mempool is congested (BTC only) — does that matter for options?</summary><div class="accbody">Only as a loose proxy for on-chain urgency/activity. It is the weakest signal on this desk by design — shown for context, not folded hard into any verdict math — because it reflects network usage, not options positioning.</div></details></div>
+      </div>
+    </div>
+
+    <div class="acsub">
+      <h4>4. Process — taking a trade off this desk, step by step</h4>
+      <div class="steplist">
+        <div class="stepit"><span class="sno"></span><div class="stxt"><b>Pick the asset.</b><span>Switch the asset tab (e.g. BTC, ETH) in the Builder. Everything below — live legs, signals, verdicts — refreshes to that asset.</span></div></div>
+        <div class="stepit"><span class="sno"></span><div class="stxt"><b>Refresh signals.</b><span>Hit "Refresh signals" in the Market Signal Verdicts panel so you're reading live data, not a stale snapshot from earlier in the session.</span></div></div>
+        <div class="stepit"><span class="sno"></span><div class="stxt"><b>Scan the verdict menu.</b><span>Every structure gets a GO / CAUTION / AVOID pill. Don't just read the color — click into the one you're considering and read the reasoning sentence underneath; it names exactly which signal is driving the call.</span></div></div>
+        <div class="stepit"><span class="sno"></span><div class="stxt"><b>Cross-check the Prediction Radar.</b><span>Look at the raw numbers and the desk's overall synthesized read. A single-structure GO that contradicts the broader radar picture is worth a second look before sizing up.</span></div></div>
+        <div class="stepit"><span class="sno"></span><div class="stxt"><b>Load real legs or enter your own.</b><span>Use "Load live legs" to pull actual Deribit strikes/premiums for that expiry, or type in your own strikes and premiums directly in the Builder — the payoff math is identical either way.</span></div></div>
+        <div class="stepit"><span class="sno"></span><div class="stxt"><b>Read the payoff chart and the four key numbers.</b><span>Max profit, max loss, breakeven(s), and net debit/credit. Confirm the breakeven(s) are realistic given how far the underlying would actually need to move by expiry.</span></div></div>
+        <div class="stepit"><span class="sno"></span><div class="stxt"><b>Read the Caution line.</b><span>Every structure has one. It names the specific way that structure fails even when the verdict is GO — read it every time, not just the first time.</span></div></div>
+        <div class="stepit"><span class="sno"></span><div class="stxt"><b>Size for the max loss you actually calculated, not the credit you're collecting.</b><span>Especially for uncapped-risk structures (ratio spreads, ladder, jade lizard's downside) — the credit is not the risk.</span></div></div>
+        <div class="stepit"><span class="sno"></span><div class="stxt"><b>Star it to the Watchlist if you're not ready yet.</b><span>Keeps the structure and its live verdict one click away without re-running the whole scan from scratch next time you check in.</span></div></div>
+      </div>
+    </div>
+
+    <div class="acsub">
+      <h4>5. Every structure on the desk, in one place</h4>
+      <p class="acnote">Pulled straight from the Builder's own data — bias badge, legs, and the one-line explainer, so this list can never drift out of sync with what the Builder actually computes.</p>
+      <div id="acStratHost" class="acgrid"></div>
+    </div>
   </div>
 </section>
 
@@ -916,7 +1033,7 @@ async function refreshSignals(){
   }catch(e){
     st.innerHTML = `<span class="ld err"></span>Signal fetch failed (${e.message})`;
   }
-  renderVerdictMenu(); renderVerdictContent(); renderWatchlist();
+  renderVerdictMenu(); renderVerdictContent(); renderWatchlist(); renderPredictionRadar();
 }
 
 function verdictFor(id, s){
@@ -1067,6 +1184,97 @@ function renderWatchlist(){
   }).join('')}</div>`;
 }
 
+function fmtPct(x, d){ return x==null ? '—' : (x*100).toFixed(d==null?2:d)+'%'; }
+function fmtNum(x, d){ return x==null ? '—' : x.toFixed(d==null?1:d); }
+
+function renderPredictionRadar(){
+  const host = document.getElementById('radarHost');
+  if(!signals){
+    host.innerHTML = `<div class="radarempty">No live signals yet — hit "Refresh signals" in the Market Signal Verdicts panel (in the Builder) to populate the radar.</div>`;
+    return;
+  }
+  const s = signals;
+  const ivPrem = s.markIv - s.realizedVol;
+  const fundingPct = (s.funding8h||0)*100;
+  const fundingExtreme = Math.abs(fundingPct) > 0.05;
+  const fngExtreme = s.fng<=20 || s.fng>=80;
+  const crowded = s.pcr!=null && (s.pcr>1.3 || s.pcr<0.6);
+  const volTag = ivPrem < -3 ? 'cheap' : (ivPrem > 3 ? 'rich' : 'fair');
+
+  const cards = [
+    {label:`${s.ccy} spot`, val:`$${fmtNum(s.spot,0)}`},
+    {label:'Implied vol (ATM)', val:fmtNum(s.markIv,1)+'%'},
+    {label:'Realized vol', val:fmtNum(s.realizedVol,1)+'%'},
+    {label:'IV − RV spread', val:(ivPrem>=0?'+':'')+ivPrem.toFixed(1)+' pts', tag:volTag},
+    {label:'Funding (8h)', val:fundingPct.toFixed(3)+'%', tag:fundingExtreme?'stretched':'calm'},
+    {label:'Fear & Greed', val:`${s.fng} (${s.fngLabel})`, tag:fngExtreme?'extreme':'calm'},
+    {label:'BTC dominance', val:fmtNum(s.btcDom,1)+'%'},
+    {label:'Total crypto mcap', val:'$'+(s.totalMcap/1e9).toFixed(0)+'B'},
+    {label:'Put/Call OI ratio', val:s.pcr!=null?s.pcr.toFixed(2):'—', tag:crowded?'lopsided':'calm'},
+    {label:'Put − Call IV skew', val:s.skew!=null?(s.skew>=0?'+':'')+s.skew.toFixed(1)+' pts':'—'},
+    {label:'Total option OI', val:s.totalOI!=null?s.totalOI.toLocaleString():'—'}
+  ];
+  if(s.ccy==='BTC' && s.mempoolFee!=null){
+    cards.push({label:'Mempool fastest fee', val:s.mempoolFee+' sat/vB'});
+    cards.push({label:'Mempool backlog', val:s.mempoolCount!=null?s.mempoolCount.toLocaleString()+' txs':'—'});
+  }
+
+  let verdictCls, verdictLabel, bits=[];
+  if(crowded && volTag==='rich'){
+    verdictCls='avoid'; verdictLabel='CROWDED — FAVOR LONG VOL';
+    bits.push(`Put/Call OI ratio is lopsided at ${s.pcr.toFixed(2)} — positioning is crowded enough that a squeeze risk outweighs the rich premium.`);
+    bits.push(`IV is running +${ivPrem.toFixed(1)} pts over realized, which would normally favor selling premium — but not against this level of crowding.`);
+    bits.push('Short-premium, capped-zone structures (condor, butterfly, ratio spreads, ladder) are the ones this crowding hits hardest.');
+  } else if(volTag==='cheap' || fngExtreme){
+    verdictCls='go'; verdictLabel='LONG VOL FAVORED';
+    if(volTag==='cheap') bits.push(`IV is running ${ivPrem.toFixed(1)} pts below realized — options are priced cheaper than the movement that's actually been happening.`);
+    if(fngExtreme) bits.push(`Sentiment is at an extreme (${s.fng}, ${s.fngLabel}) — extremes have historically preceded sharper moves, which pays structures that need a big move.`);
+    if(fundingExtreme) bits.push(`Funding is stretched (${fundingPct.toFixed(3)}%/8h) — one side of the perp market is crowded, raising squeeze odds on top of the above.`);
+    bits.push('Favors straddle, strangle, the backspreads, guts, and the reverse iron condor over the premium-selling structures right now.');
+  } else if(volTag==='rich' && !crowded){
+    verdictCls='go'; verdictLabel='SHORT VOL FAVORED';
+    bits.push(`IV is running +${ivPrem.toFixed(1)} pts above realized — the market is pricing in more movement than it has actually delivered recently.`);
+    bits.push(`Positioning is reasonably balanced (PCR ${s.pcr!=null?s.pcr.toFixed(2):'—'}) and funding isn't stretched, so there's no obvious crowd-squeeze working against a short-premium structure right now.`);
+    bits.push('Favors the iron condor, iron butterfly, calendars, ratio spreads, and the ladder over the premium-buying structures — remember the uncapped-risk ones still need their own size discipline.');
+  } else {
+    verdictCls='caution'; verdictLabel='NO CLEAR EDGE';
+    bits.push(`IV vs realized is roughly fair (${ivPrem>=0?'+':''}${ivPrem.toFixed(1)} pts) — no strong premium mispricing in either direction.`);
+    bits.push(`Sentiment (${s.fng}, ${s.fngLabel}) and funding (${fundingPct.toFixed(3)}%/8h) aren't at an extreme either.`);
+    bits.push('Whatever you pick here is running on its own structural merits, not a live tailwind from these signals — size accordingly.');
+  }
+
+  host.innerHTML = `
+    <div class="radargrid">${cards.map(c=>`
+      <div class="radarcard">
+        <small>${c.label}</small><b>${c.val}</b>
+        ${c.tag?`<span class="tag ${c.tag}">${c.tag}</span>`:''}
+      </div>`).join('')}
+    </div>
+    <div class="radarverdict">
+      <h4><span class="vpill v-${verdictCls}">${verdictLabel}</span></h4>
+      <ul>${bits.map(b=>`<li>${b}</li>`).join('')}</ul>
+    </div>
+    <p class="acnote" style="margin-top:10px">Updated ${new Date(s.ts).toLocaleTimeString()}. This is a synthesis of the same signals each per-structure verdict uses — it's a starting lens, not a substitute for reading the specific structure's own verdict and caution line.</p>
+  `;
+}
+
+function renderAcademyStrategies(){
+  const host = document.getElementById('acStratHost');
+  if(!host) return;
+  host.innerHTML = STRATEGIES.map(s=>{
+    const badgeCls = s.theta.includes('Negative')?'long':(s.theta.includes('Positive')?'short':'flat');
+    const badgeTxt = s.theta.includes('Negative')?'Long Vol':(s.theta.includes('Positive')?'Short Vol':'Flat / Arb');
+    return `<div class="acc"><details>
+      <summary><span>${s.name}</span><span class="bias ${badgeCls}">${badgeTxt}</span></summary>
+      <div class="accbody">
+        <div>${s.desc}</div>
+        <div class="legs">${s.legs.join(' · ')}</div>
+        <div style="margin-top:6px">Theta: ${s.theta} · Premium: ${s.premium} · Read: ${s.dir}</div>
+      </div>
+    </details></div>`;
+  }).join('');
+}
+
 function legsFromDefaults(d){
   const legs = [];
   ['legA','legB','legC','legD'].forEach(k=>{ if(d[k]) legs.push({...d[k], ratio:d[k].ratio||1}); });
@@ -1148,7 +1356,7 @@ function renderVerdictContent(){
 document.getElementById('vbRefresh').addEventListener('click', refreshSignals);
 
 /* ---------- Version check / update button ---------- */
-const CURRENT_VERSION = "1.4";
+const CURRENT_VERSION = "1.5";
 let updateAvailable = null; // set to remote version string when a newer one is seen
 
 async function doRefreshData(){
@@ -1222,6 +1430,8 @@ renderLivePanel();
 renderVerdictMenu();
 renderVerdictContent();
 renderWatchlist();
+renderPredictionRadar();
+renderAcademyStrategies();
 </script>
 </body>
 </html>
