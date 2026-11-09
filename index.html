@@ -92,6 +92,27 @@ section p.sdesc{color:var(--muted);margin-top:10px;font-size:14px;line-height:1.
 .livepanel .note{font-size:12px;color:var(--muted);line-height:1.5;border-top:1px dashed var(--line);padding-top:10px}
 .livepanel .note b{color:var(--fg)}
 .keybox{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end}
+.vbsec{border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:16px;margin-bottom:16px}
+.vb-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.vb-head b{font-size:14px}
+.vb-body{display:grid;grid-template-columns:200px 1fr;gap:14px}
+@media(max-width:700px){.vb-body{grid-template-columns:1fr}}
+.vmenu{display:flex;flex-direction:column;gap:4px}
+.vmitem{display:flex;justify-content:space-between;align-items:center;gap:8px;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:9px 11px;cursor:pointer;font-size:13px;text-align:left}
+.vmitem:hover{border-color:var(--accent)}
+.vmitem.on{border-color:var(--accent);background:var(--surface2)}
+.vpill{font:700 10.5px var(--mono);letter-spacing:.05em;padding:2px 9px;border-radius:999px;border:1px solid var(--line);white-space:nowrap}
+.vpill.v-go{color:var(--up);border-color:var(--up);background:color-mix(in srgb,var(--up) 12%,transparent)}
+.vpill.v-caution{color:var(--warn);border-color:var(--warn);background:color-mix(in srgb,var(--warn) 12%,transparent)}
+.vpill.v-avoid{color:var(--down);border-color:var(--down);background:color-mix(in srgb,var(--down) 12%,transparent)}
+.vpill.lg{font-size:13px;padding:4px 14px}
+.vcontent{display:flex;flex-direction:column;gap:10px;min-width:0}
+.vc-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;border:1px solid var(--line);border-radius:9px;padding:10px 12px;background:var(--bg)}
+.vc-why{font-size:12.5px;color:var(--muted);line-height:1.5}
+table.vtab{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12.5px}
+table.vtab td{padding:6px 8px;border-bottom:1px solid var(--line)}
+table.vtab td:first-child{color:var(--muted)}
+table.vtab td:last-child{text-align:right;font-weight:600}
 .builder{display:grid;grid-template-columns:minmax(280px,360px) minmax(0,1fr);gap:20px;align-items:start}
 @media (max-width:860px){.builder{grid-template-columns:1fr}}
 .panel{border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:18px;display:flex;flex-direction:column;gap:14px}
@@ -179,6 +200,19 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
 
     <div class="assettabs" id="assettabs"></div>
     <div id="livePanelHost"></div>
+
+    <div class="vbsec">
+      <div class="vb-head">
+        <b>Market Signal Verdicts</b>
+        <select id="vbCcy"><option value="BTC">BTC</option><option value="ETH">ETH</option></select>
+        <button class="btn primary" id="vbRefresh">Refresh signals</button>
+        <span class="lp-status" id="vbStatus"><span class="ld"></span>Not loaded</span>
+      </div>
+      <div class="vb-body">
+        <div class="vmenu" id="vmenu"></div>
+        <div class="vcontent" id="vcontent"></div>
+      </div>
+    </div>
 
     <div class="builder">
       <div class="panel" id="inputsPanel"></div>
@@ -643,11 +677,148 @@ function applyLegsToForm(legsWithPrem, spot){
   compute();
 }
 
+/* ---------- Market Signal Verdicts (all free, no key) ---------- */
+let signals = null;
+const VSTRATS = [
+  {id:'straddle', label:'Straddle'},
+  {id:'strangle', label:'Strangle'},
+  {id:'condor', label:'Iron Condor'},
+  {id:'deltaneutral', label:'Delta-Neutral / Hedged'}
+];
+let activeVstrat = 'straddle';
+
+async function fetchAtmIv(ccy){
+  const instRes = await fetch(`https://www.deribit.com/api/v2/public/get_instruments?currency=${ccy}&kind=option&expired=false`);
+  const instData = await instRes.json();
+  const instruments = instData.result;
+  const expiries = [...new Set(instruments.map(i=>i.expiration_timestamp))].sort((a,b)=>a-b);
+  const nearExp = expiries[0];
+  const calls = instruments.filter(i=>i.expiration_timestamp===nearExp && i.option_type==='call');
+  const probe = await fetchTicker(calls[0].instrument_name);
+  const spot = probe.underlying_price;
+  const strikes = calls.map(i=>i.strike);
+  const atmStrike = nearest(strikes, spot);
+  const atmName = calls.find(i=>i.strike===atmStrike).instrument_name;
+  const atmTicker = await fetchTicker(atmName);
+  return {iv: atmTicker.mark_iv, spot};
+}
+async function fetchRealizedVol(ccy){
+  const res = await fetch(`https://www.deribit.com/api/v2/public/get_historical_volatility?currency=${ccy}`);
+  const data = await res.json();
+  const arr = data.result;
+  return arr[arr.length-1][1];
+}
+async function fetchFunding(ccy){
+  const t = await fetchTicker(`${ccy}-PERPETUAL`);
+  return (t.funding_8h ?? t.current_funding ?? null);
+}
+async function fetchFng(){
+  const res = await fetch('https://api.alternative.me/fng/?limit=1');
+  const data = await res.json();
+  const d = data.data[0];
+  return {value: parseInt(d.value), label: d.value_classification};
+}
+async function fetchDominance(){
+  const res = await fetch('https://api.coingecko.com/api/v3/global');
+  const data = await res.json();
+  return {btcDom: data.data.market_cap_percentage.btc, totalMcap: data.data.total_market_cap.usd};
+}
+
+async function refreshSignals(){
+  const ccy = document.getElementById('vbCcy').value;
+  const st = document.getElementById('vbStatus');
+  st.innerHTML = `<span class="ld"></span>Loading…`;
+  try{
+    const [atm, rv, funding, fng, dom] = await Promise.all([
+      fetchAtmIv(ccy), fetchRealizedVol(ccy), fetchFunding(ccy), fetchFng(), fetchDominance()
+    ]);
+    signals = {ccy, markIv: atm.iv, spot: atm.spot, realizedVol: rv, funding8h: funding,
+      fng: fng.value, fngLabel: fng.label, btcDom: dom.btcDom, totalMcap: dom.totalMcap, ts: Date.now()};
+    st.innerHTML = `<span class="ld ok"></span>Updated ${new Date().toLocaleTimeString()}`;
+  }catch(e){
+    st.innerHTML = `<span class="ld err"></span>Signal fetch failed (${e.message})`;
+  }
+  renderVerdictMenu(); renderVerdictContent();
+}
+
+function verdictFor(id, s){
+  const ivPrem = s.markIv - s.realizedVol;
+  const fundingPct = (s.funding8h||0)*100;
+  const fundingExtreme = Math.abs(fundingPct) > 0.05;
+  const fngExtreme = s.fng<=20 || s.fng>=80;
+
+  if(id==='straddle' || id==='strangle'){
+    if(ivPrem < -3 || fngExtreme){
+      const bits=[];
+      if(ivPrem<-3) bits.push('implied vol is running below realized — options look cheap relative to recent movement');
+      if(fngExtreme) bits.push(`sentiment is at an extreme (${s.fngLabel}), which raises the odds of a sharp move`);
+      return {cls:'go', label:'GO', reason: bits.join('; ')+'.'};
+    }
+    if(ivPrem > 6) return {cls:'avoid', label:'AVOID', reason:`Implied vol is well above realized (+${ivPrem.toFixed(1)} pts) — you'd be paying for movement that hasn't been showing up.`};
+    return {cls:'caution', label:'CAUTION', reason:`IV vs realized is roughly fair (${ivPrem>=0?'+':''}${ivPrem.toFixed(1)} pts) — no strong premium edge either way.`};
+  }
+  if(id==='condor'){
+    if(fngExtreme || fundingExtreme){
+      const bits=[];
+      if(fngExtreme) bits.push(`sentiment extreme (${s.fngLabel})`);
+      if(fundingExtreme) bits.push(`funding stretched (${fundingPct.toFixed(3)}%/8h)`);
+      return {cls:'avoid', label:'AVOID', reason:`${bits.join(' and ')} — crowd positioning raises breakout/squeeze risk against a range-bound structure.`};
+    }
+    if(ivPrem > 3) return {cls:'go', label:'GO', reason:`Implied vol is running ${ivPrem.toFixed(1)} pts above realized — selling premium is being paid more than recent movement justifies.`};
+    return {cls:'caution', label:'CAUTION', reason:`Premium isn't clearly rich (${ivPrem>=0?'+':''}${ivPrem.toFixed(1)} pts vs realized) — size down or wait for a better credit.`};
+  }
+  // delta-neutral / hedged
+  if(s.realizedVol > s.markIv) return {cls:'go', label:'GO', reason:`Realized vol (${s.realizedVol.toFixed(1)}%) is outrunning implied (${s.markIv.toFixed(1)}%) — more actual movement to rebalance against than you're paying in premium.`};
+  if(fundingExtreme) return {cls:'caution', label:'CAUTION', reason:`Funding is stretched (${fundingPct.toFixed(3)}%/8h) — a hedged book still needs active risk management here, not a free ride.`};
+  return {cls:'caution', label:'CAUTION', reason:`Low realized vol (${s.realizedVol.toFixed(1)}%) means thinner gamma-scalping opportunity — mostly a theta/funding carry environment right now.`};
+}
+
+function renderVerdictMenu(){
+  const host = document.getElementById('vmenu');
+  host.innerHTML = VSTRATS.map(s=>{
+    const v = signals ? verdictFor(s.id, signals) : null;
+    return `<button class="vmitem ${s.id===activeVstrat?'on':''}" data-v="${s.id}">
+      <span>${s.label}</span>${v?`<span class="vpill v-${v.cls}">${v.label}</span>`:''}
+    </button>`;
+  }).join('');
+  host.querySelectorAll('.vmitem').forEach(b=>b.addEventListener('click',()=>{
+    activeVstrat = b.dataset.v; renderVerdictMenu(); renderVerdictContent();
+  }));
+}
+
+function renderVerdictContent(){
+  const host = document.getElementById('vcontent');
+  if(!signals){ host.innerHTML = `<div class="note">Click "Refresh signals" to pull live IV, realized vol, funding, sentiment and dominance data.</div>`; return; }
+  const v = verdictFor(activeVstrat, signals);
+  const s = signals;
+  host.innerHTML = `
+    <div class="vc-top">
+      <span class="vpill v-${v.cls} lg">${v.label}</span>
+      <span class="vc-why">${v.reason}</span>
+    </div>
+    <table class="vtab">
+      <tr><td>Spot (${s.ccy})</td><td>$${s.spot.toFixed(2)}</td></tr>
+      <tr><td>ATM mark IV</td><td>${s.markIv.toFixed(1)}%</td></tr>
+      <tr><td>Realized vol</td><td>${s.realizedVol.toFixed(1)}%</td></tr>
+      <tr><td>IV − realized</td><td>${(s.markIv-s.realizedVol>=0?'+':'')}${(s.markIv-s.realizedVol).toFixed(1)} pts</td></tr>
+      <tr><td>Perp funding (8h)</td><td>${s.funding8h!=null?(s.funding8h*100).toFixed(4)+'%':'—'}</td></tr>
+      <tr><td>Fear &amp; Greed</td><td>${s.fng} (${s.fngLabel})</td></tr>
+      <tr><td>BTC dominance</td><td>${s.btcDom.toFixed(1)}%</td></tr>
+      <tr><td>Total crypto mcap</td><td>$${(s.totalMcap/1e9).toFixed(1)}B</td></tr>
+    </table>
+    <div class="note">As of ${new Date(s.ts).toLocaleTimeString()}. Verdict is a transparent heuristic from IV-vs-realized spread, funding stretch and sentiment extremes — not a guarantee. Cross-check against the strategy card's caution line above.</div>
+  `;
+}
+
+document.getElementById('vbRefresh').addEventListener('click', refreshSignals);
+
 renderCards();
 renderInputs();
 compute();
 renderTabs();
 renderLivePanel();
+renderVerdictMenu();
+renderVerdictContent();
 </script>
 </body>
 </html>
