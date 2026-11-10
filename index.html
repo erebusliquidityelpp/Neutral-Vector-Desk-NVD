@@ -237,6 +237,25 @@ table.vtab td:last-child{text-align:right;font-weight:600}
 .macronote{font-size:12px;color:var(--muted);line-height:1.6;border-top:1px dashed var(--line);padding-top:10px;margin-top:4px}
 .macronote b{color:var(--fg)}
 
+.caltbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.caltbl th{text-align:left;color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;padding:7px 9px;border-bottom:1px solid var(--line)}
+.caltbl td{padding:8px 9px;border-bottom:1px dashed var(--line);vertical-align:top}
+.caltbl tr.big td{color:var(--accent2);font-weight:600}
+.calimpact{display:inline-block;font-size:10px;padding:2px 8px;border-radius:999px;border:1px solid var(--line)}
+.calimpact.high{color:var(--down);border-color:var(--down)}
+.calimpact.medium{color:var(--warn);border-color:var(--warn)}
+.calimpact.low{color:var(--muted)}
+
+.jtbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.jtbl th{text-align:left;color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;padding:7px 9px;border-bottom:1px solid var(--line)}
+.jtbl td{padding:8px 9px;border-bottom:1px dashed var(--line);vertical-align:top}
+.jstatus{display:inline-block;font-size:10px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.jstatus.closed{color:var(--up);border-color:var(--up)}
+.jpl.up{color:var(--up)} .jpl.dn{color:var(--down)}
+.jsumgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px}
+.ticketbox{border:1px dashed var(--line);border-radius:10px;padding:12px;margin-top:10px;background:var(--surface2)}
+.ticketbox pre{white-space:pre-wrap;font-family:var(--mono);font-size:11.5px;color:var(--fg);margin:8px 0}
+
 footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
 </style>
 </head>
@@ -272,10 +291,12 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
       <a href="#radar">Prediction Radar</a>
       <a href="#exchanges">Exchanges</a>
       <a href="#macro">Macro Fundamentals</a>
+      <a href="#calendar">Calendar</a>
+      <a href="#journal">Journal</a>
       <a href="#academy">Vocabulary &amp; Academy</a>
       <a href="#manual">Manual</a>
     </nav>
-    <span class="chip verchip" id="verChip">v1.8</span>
+    <span class="chip verchip" id="verChip">v1.9</span>
     <button class="btn sm" id="globalRefresh">⟳ Refresh</button>
     <span class="chip"><span class="dot"></span> Client-side · no stored data</span>
   </div>
@@ -339,6 +360,11 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
         <div class="kvgrid" id="kvgrid"></div>
         <div class="chartwrap"><svg id="payoffSvg" viewBox="0 0 640 320" preserveAspectRatio="xMidYMid meet"></svg></div>
         <div class="caution" id="caution"></div>
+        <div class="lp-row" style="margin-top:12px">
+          <button class="btn" id="buildTicket">Build trade ticket</button>
+          <button class="btn primary" id="logTrade">Log this trade to Journal</button>
+        </div>
+        <div id="ticketHost"></div>
       </div>
     </div>
   </div>
@@ -453,6 +479,65 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
   </div>
 </section>
 
+<section id="calendar">
+  <div class="wrap">
+    <div class="shead">
+      <div class="kicker">Calendar</div>
+      <h3 class="stitle">Options expiry calendar &amp; macro event calendar</h3>
+      <p class="sdesc">Two different "calendars," both live: when crypto options actually expire (this desk's own purpose, pulled straight from Deribit), and a ForexFactory/CryptoCraft-style macro event schedule for context.</p>
+    </div>
+
+    <div class="livepanel">
+      <div class="lp-head">
+        <b>Options expiry calendar — Deribit, live, free</b>
+        <span class="lp-status" id="expiryStatus"><span class="ld"></span>Idle</span>
+      </div>
+      <div class="lp-row">
+        <div class="field"><label>Currency</label><select id="expCcy"><option value="BTC">BTC</option><option value="ETH">ETH</option><option value="SOL">SOL</option><option value="XRP">XRP</option></select></div>
+        <button class="btn primary" id="expFetch">Load expiry calendar</button>
+      </div>
+      <div class="note">Every live, un-expired instrument Deribit lists for the currency, grouped by expiry date with total open interest summed per date. The big monthly/quarterly expiries (usually the last Friday of the month) carry the most OI and tend to matter most for pinning/IV-crush — this just shows you which date that actually is right now, instead of you having to know Deribit's calendar convention by heart.</div>
+      <div id="expiryHost"></div>
+    </div>
+
+    <div class="livepanel">
+      <div class="lp-head">
+        <b>Macro event calendar — unofficial ForexFactory feed</b>
+        <span class="lp-status" id="macCalStatus"><span class="ld"></span>Idle</span>
+      </div>
+      <div class="lp-row">
+        <button class="btn primary" id="macCalFetch">Load this week's events</button>
+      </div>
+      <div class="note">This is the same free, un-keyed JSON feed (<code>nfs.faireconomy.media</code>) that powers ForexFactory's own embeddable calendar widget — it is not an official, documented API and could change or go away without notice, so treat it as "usually works," not guaranteed. It gives the scheduled date/time, currency, and impact of each release (CPI, NFP, FOMC, etc.) plus the <b>economist consensus forecast and the prior reading</b> — this is the one free source found for that otherwise-paid survey-consensus number flagged in Macro Fundamentals above. It does not give released actual values ahead of time, because nothing does.</div>
+      <div id="macCalHost"></div>
+    </div>
+  </div>
+</section>
+
+<section id="journal">
+  <div class="wrap">
+    <div class="shead">
+      <div class="kicker">Journal</div>
+      <h3 class="stitle">Advanced journal — auto-captured, not typed in</h3>
+      <p class="sdesc">Every field below is pulled straight from the Builder and live signal panel at the moment you click "Log this trade" in the Builder above — strikes, premiums, max profit/loss, breakevens, and the signal verdict that was showing at the time. Nothing here is manually entered, so there's no risk of the journal drifting from what you actually built.</p>
+    </div>
+    <div id="journalSummary"></div>
+    <div class="livepanel">
+      <div class="lp-head">
+        <b>Logged trades</b>
+        <span class="lp-status"></span>
+      </div>
+      <div class="lp-row">
+        <button class="btn" id="journalExportCsv">Export CSV</button>
+        <button class="btn" id="journalExportJson">Export JSON</button>
+        <button class="btn" id="journalClearAll">Clear all</button>
+      </div>
+      <div class="note">Stored only in this browser's local storage (<code>nvd_journal</code>) — nothing is sent anywhere. Clearing your browser data or switching devices means this journal doesn't come with you unless you export it first.</div>
+      <div id="journalHost"></div>
+    </div>
+  </div>
+</section>
+
 <section id="academy">
   <div class="wrap">
     <div class="shead">
@@ -541,6 +626,21 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
       <summary><h4>5. Every structure on the desk, in one place</h4></summary>
       <p class="acnote">Pulled straight from the Builder's own data — bias badge, legs, and the one-line explainer, so this list can never drift out of sync with what the Builder actually computes.</p>
       <div id="acStratHost" class="acgrid"></div>
+    </details>
+
+    <details class="acsub">
+      <summary><h4>6. How stock (equity) options actually work — and what changes per structure</h4></summary>
+      <p class="acnote">Crypto options on Deribit are European-style, cash-settled, and trade 24/7 — none of that is true for listed equity options. If you build any of these 17 structures on stocks instead of crypto, these mechanics change the real-world risk even though the payoff math in this builder is identical.</p>
+      <dl class="gloss">
+        <dt>Contract size (100 shares)</dt><dd>One listed equity option = 100 shares, not 1. Set the Builder's "Multiplier" field to 100 for stocks (it defaults to crypto's 1-coin sizing) — leaving it wrong makes every dollar figure off by 100x.</dd>
+        <dt>American-style exercise &amp; early assignment</dt><dd>Nearly all single-stock options can be exercised any time before expiry, not just at expiry like Deribit's crypto options. Any leg where you're <b>short</b> an option can be assigned early — meaning a multi-leg "non-directional" structure can suddenly become a naked stock position overnight, before you intended to close anything.</dd>
+        <dt>Dividend / ex-dividend risk on short calls</dt><dd>A short call deep ITM going into an ex-dividend date is a real early-assignment risk — the holder may exercise to capture the dividend, handing you a short-stock position you didn't plan for. This specifically threatens the short-call leg in straddles, strangles, condors, butterflies, call ratio spreads, ladders, and jade lizards.</dd>
+        <dt>Margin / buying power</dt><dd>Crypto options on this desk assume you simply hold the premium; equity options require your broker's margin methodology (Reg T or portfolio margin) to even open many of these multi-leg or short-premium structures, and "max loss" in the builder is not the same number as the margin/buying-power your broker will hold.</dd>
+        <dt>Pattern Day Trader (PDT) rule</dt><dd>US accounts under $25,000 equity face a 3-day-trade-in-5-business-days limit before being flagged PDT, which can restrict exactly the kind of active entry/exit this desk's signals encourage. Crypto/Deribit has no such rule.</dd>
+        <dt>Settlement (T+1)</dt><dd>US equity trades settle T+1 (one business day) as of 2024; options themselves settle the next business day after exercise/assignment. Crypto settles effectively instantly. This affects how fast capital from a closed leg is actually available again, not the payoff math itself.</dd>
+      </dl>
+      <p class="acnote">Per-structure stock-specific note (same 17 structures as the Builder):</p>
+      <div id="acStockNoteHost" class="acgrid"></div>
     </details>
   </div>
 </section>
@@ -735,6 +835,7 @@ const STRATEGIES = [
 ];
 
 let current = STRATEGIES[0];
+let lastCompute = null;
 
 function legCount(s){ return ['legA','legB','legC','legD'].filter(k=>s.defaults[k]).length; }
 
@@ -873,6 +974,15 @@ function compute(){
     guts:'Built from in-the-money options, so the upfront cost is much larger than a straddle at the same strikes\' distance from spot. The breakevens are wider — check the actual dollar cost before assuming this behaves like a cheap straddle.'
   };
   document.getElementById('caution').innerHTML = `<b>Caution —</b> ${cautions[current.id]}`;
+
+  const netVal = legs.reduce((s,l)=>s+(l.side==='buy'?l.premium:-l.premium),0)*mult*qty;
+  lastCompute = {
+    stratId: current.id, stratName: current.name, asset: activeAsset, ccy: (signals&&signals.ccy)||document.getElementById('drbCcy')?.value||'',
+    spot, qty, mult, legs,
+    maxProfit: maxP>=9e8?null:maxP, maxLoss: minP, breakevens,
+    netIsDebit: netVal>=0, netAmount: Math.abs(netVal),
+    ts: Date.now()
+  };
 }
 
 function drawChart(curve, spot, breakevens, minP, maxP){
@@ -1100,6 +1210,100 @@ function initMacroPanel(){
   });
   document.getElementById('macroFetch').addEventListener('click', refreshMacro);
   renderMacroStub(document.getElementById('macroHost'));
+}
+
+/* --- Options expiry calendar: live, free, Deribit --- */
+async function fetchExpiryCalendar(){
+  const host = document.getElementById('expiryHost');
+  const st = document.getElementById('expiryStatus');
+  const ccy = document.getElementById('expCcy').value;
+  st.innerHTML = `<span class="ld"></span>Loading…`;
+  try{
+    const res = await fetch(`https://www.deribit.com/api/v2/public/get_instruments?currency=${ccy}&kind=option&expired=false`);
+    const data = await res.json();
+    const instruments = data.result || [];
+    if(!instruments.length){
+      host.innerHTML = `<div class="macronote">No live option instruments returned for ${ccy} right now.</div>`;
+      st.innerHTML = `<span class="ld err"></span>Empty response`;
+      return;
+    }
+    const byExp = {};
+    instruments.forEach(i=>{
+      byExp[i.expiration_timestamp] = byExp[i.expiration_timestamp] || {count:0, calls:0, puts:0};
+      byExp[i.expiration_timestamp].count++;
+      if(i.option_type==='call') byExp[i.expiration_timestamp].calls++; else byExp[i.expiration_timestamp].puts++;
+    });
+    const expiries = Object.keys(byExp).map(Number).sort((a,b)=>a-b);
+    const maxCount = Math.max(...expiries.map(e=>byExp[e].count));
+    const rows = expiries.map(ts=>{
+      const d = new Date(ts);
+      const label = d.toLocaleDateString('en-US',{weekday:'short', day:'2-digit', month:'short', year:'numeric'});
+      const daysOut = Math.round((ts - Date.now())/86400000);
+      const row = byExp[ts];
+      const isBig = row.count === maxCount;
+      return `<tr class="${isBig?'big':''}"><td>${label}${isBig?' ★':''}</td><td>${daysOut}d</td><td>${row.calls}</td><td>${row.puts}</td><td>${row.count}</td></tr>`;
+    }).join('');
+    host.innerHTML = `
+      <table class="caltbl">
+        <tr><th>Expiry</th><th>Days out</th><th>Live calls</th><th>Live puts</th><th>Total instruments</th></tr>
+        ${rows}
+      </table>
+      <div class="macronote">★ marks the expiry with the most live instruments listed right now (a proxy for where market-maker/liquidity attention concentrates — not the same as open interest, which Deribit doesn't expose pre-aggregated by expiry via this endpoint). ${expiries.length} expiries live for ${ccy} as of ${new Date().toLocaleTimeString()}.</div>
+    `;
+    st.innerHTML = `<span class="ld ok"></span>${instruments.length} instruments across ${expiries.length} expiries`;
+  }catch(e){
+    host.innerHTML = `<div class="macronote">Fetch failed: ${e.message}</div>`;
+    st.innerHTML = `<span class="ld err"></span>Fetch failed`;
+  }
+}
+
+/* --- Macro event calendar: unofficial free ForexFactory-style feed --- */
+async function fetchMacroCalendar(){
+  const host = document.getElementById('macCalHost');
+  const st = document.getElementById('macCalStatus');
+  st.innerHTML = `<span class="ld"></span>Loading…`;
+  try{
+    const res = await fetch('https://nfs.faireconomy.media/ff_calendar_thisweek.json');
+    if(!res.ok) throw new Error('bad response ('+res.status+')');
+    const events = await res.json();
+    if(!Array.isArray(events) || !events.length){
+      host.innerHTML = `<div class="macronote">Feed returned no events — it may be between weekly refreshes, or temporarily unavailable.</div>`;
+      st.innerHTML = `<span class="ld err"></span>Empty response`;
+      return;
+    }
+    const major = events.filter(e=>(e.impact||'').toLowerCase()!=='low' && (e.impact||'').toLowerCase()!=='holiday');
+    const rows = major.slice(0,40).map(e=>{
+      const impact = (e.impact||'').toLowerCase();
+      let when = e.date || '';
+      try{ when = new Date(e.date).toLocaleString('en-US',{weekday:'short', month:'short', day:'2-digit', hour:'2-digit', minute:'2-digit'}); }catch(_){}
+      return `<tr>
+        <td>${when}</td>
+        <td>${e.country||''}</td>
+        <td>${e.title||''}</td>
+        <td><span class="calimpact ${impact}">${e.impact||'—'}</span></td>
+        <td>${e.forecast||'—'}</td>
+        <td>${e.previous||'—'}</td>
+      </tr>`;
+    }).join('');
+    host.innerHTML = `
+      <table class="caltbl">
+        <tr><th>When</th><th>Ccy</th><th>Event</th><th>Impact</th><th>Forecast</th><th>Previous</th></tr>
+        ${rows}
+      </table>
+      <div class="macronote">Medium/high-impact events only, this week, from the unofficial feed above. "Forecast" here is the real economist survey consensus this feed carries — the one thing Macro Fundamentals above flagged as otherwise paid. Times are as the feed reports them; double-check against your own broker/exchange clock before trading around a release.</div>
+    `;
+    st.innerHTML = `<span class="ld ok"></span>${major.length} medium/high-impact events this week`;
+  }catch(e){
+    host.innerHTML = `<div class="macronote">Fetch failed: ${e.message}. This is an unofficial, undocumented feed — it can rate-limit, change shape, or go away without notice.</div>`;
+    st.innerHTML = `<span class="ld err"></span>Fetch failed`;
+  }
+}
+
+function initCalendarPanels(){
+  const expBtn = document.getElementById('expFetch');
+  if(expBtn) expBtn.addEventListener('click', fetchExpiryCalendar);
+  const macBtn = document.getElementById('macCalFetch');
+  if(macBtn) macBtn.addEventListener('click', fetchMacroCalendar);
 }
 
 /* --- Crypto: live option chain via Deribit public API (free, no key) --- */
@@ -1597,6 +1801,34 @@ function renderAcademyStrategies(){
   }).join('');
 }
 
+const STOCK_NOTES = {
+  straddle:'Both legs are short-dated and ATM — if either goes ITM near an ex-dividend date, early assignment on the short side of a related hedge (if any) is the main extra risk. Otherwise the biggest change from crypto is just contract size (x100) and that exercise can happen any day, not only at expiry.',
+  strangle:'Same as straddle: the OTM strikes mean assignment risk is lower day-to-day, but a sharp rally into an ex-div date still puts the short call at early-assignment risk if it goes ITM.',
+  condor:'Two short strikes (call and put) means two separate early-assignment exposures. A short call that goes ITM into an ex-div date can be assigned before you plan to close, turning the condor into a messier position than the payoff chart shows.',
+  butterfly:'The short middle strikes are the assignment risk here — same ex-dividend mechanic as the condor, concentrated at one strike instead of a range.',
+  calendar:'This is the structure most changed by going from crypto to stock: Deribit\'s European-style settlement makes "front-month vs back-month" purely a time-value question, but with American-style stock options the short front-month leg can be assigned early, especially around an ex-div date, before the back-month leg has had time to do its job.',
+  diagonal:'Same early-assignment exposure on the short near-leg as the calendar, plus the extra strike distance means the margin treatment your broker applies may differ from a standard calendar — check before assuming they size the same.',
+  doublecalendar:'Two short near-month legs means two separate early-assignment exposures (and two ex-div risk windows if both are calls). Worth checking both underlyings\' ex-div dates before entry, not just one.',
+  putratio:'The extra short put is the assignment risk here — if it goes deep ITM, you could be assigned stock (forced to buy 100 shares per contract) before expiry, tying up capital/margin you didn\'t plan for.',
+  callratio:'The extra short call carries real early-assignment and dividend risk — if it\'s ITM into an ex-div date you can be assigned and suddenly short stock, which is a materially different position than "short an uncapped call" on a cash-settled crypto option.',
+  jadelizard:'The short call spread\'s short leg and the naked short put both carry assignment risk; the short put in particular can hand you a long-stock position (and a margin call) if assigned when deep ITM.',
+  brokenwing:'Whichever side is narrower concentrates the early-assignment exposure on that short strike — check which wing is narrow before assuming the dividend/assignment risk is symmetric.',
+  box:'A box spread is 4 legs, 2 of them short — in the equity version each short leg carries ordinary early-assignment risk, which can disturb the "locked-in" payoff this structure is supposed to guarantee if one leg gets assigned before the others are closed. Crypto\'s European-style settlement is actually a real advantage for this specific structure.',
+  callbackspread:'Only one short call (the lower strike) — same ex-dividend/early-assignment risk as a single short call elsewhere, scaled by however many contracts your ratio uses.',
+  putbackspread:'Only one short put (the higher strike) — can be assigned stock if deep ITM, same as the put-ratio case, scaled by your ratio.',
+  ladder:'The uncapped short-call zone above the top strike is already the main risk on this desk\'s own caution; on stocks, that short call also carries ordinary early-assignment/dividend risk on top of the uncapped payoff risk.',
+  reversecondor:'Net debit paid upfront with two short inner strikes — both carry early-assignment exposure, which matters more here than on a credit structure because you\'ve already paid the cost and an early assignment disrupts the position before it\'s had time to work.',
+  guts:'Built from two ITM options (one long, one short per side depending on construction) — the short leg(s) are already ITM by design, which maximizes early-assignment likelihood versus every other structure on this list. Treat this as the highest-assignment-risk structure here if built on stock.'
+};
+function renderStockNotes(){
+  const host = document.getElementById('acStockNoteHost');
+  if(!host) return;
+  host.innerHTML = STRATEGIES.map(s=>`<div class="acc"><details>
+      <summary><span>${s.name}</span></summary>
+      <div class="accbody">${STOCK_NOTES[s.id]||'No stock-specific note yet for this structure.'}</div>
+    </details></div>`).join('');
+}
+
 function initManualProtection(){
   const doc = document.getElementById('manualDoc');
   if(!doc) return;
@@ -1699,7 +1931,7 @@ function renderVerdictContent(){
 document.getElementById('vbRefresh').addEventListener('click', refreshSignals);
 
 /* ---------- Version check / update button ---------- */
-const CURRENT_VERSION = "1.8";
+const CURRENT_VERSION = "1.9";
 let updateAvailable = null; // set to remote version string when a newer one is seen
 
 async function doRefreshData(){
@@ -1748,6 +1980,183 @@ async function checkForUpdate(){
   }catch(e){ /* version.json may not exist on every host (e.g. a standalone copy) — fail silently */ }
 }
 
+/* ---------- Trade Ticket (safe, read-only — never touches a secret/trade API key) ---------- */
+const EXCHANGE_LINKS = {
+  BTC:'https://www.deribit.com/options/BTC', ETH:'https://www.deribit.com/options/ETH',
+  SOL:'https://www.deribit.com/options/SOL', XRP:'https://www.deribit.com/options/XRP'
+};
+function buildTradeTicket(){
+  const host = document.getElementById('ticketHost');
+  if(!lastCompute || !lastCompute.legs || !lastCompute.legs.length){
+    host.innerHTML = `<div class="macronote">Run the builder first (adjust a strike or premium) so there's a live structure to ticket.</div>`;
+    return;
+  }
+  const lc = lastCompute;
+  const legLines = lc.legs.map((l,i)=>{
+    const sideWord = l.side==='buy' ? 'BUY' : 'SELL';
+    const typeWord = l.type==='call' ? 'CALL' : 'PUT';
+    return `  Leg ${i+1}: ${sideWord} ${l.ratio>1?l.ratio+'x ':''}${typeWord} @ strike ${l.strike}  — limit premium ${l.premium}`;
+  }).join('\n');
+  const ccy = lc.ccy || '';
+  const exLink = EXCHANGE_LINKS[ccy] || 'https://www.deribit.com/options';
+  const text = `NEUTRAL VECTOR DESK — TRADE TICKET (read-only, paste into your exchange manually)
+Strategy: ${lc.stratName}
+Underlying spot (at build time): ${lc.spot}
+Quantity (contracts): ${lc.qty}   Multiplier: ${lc.mult}
+${legLines}
+Net ${lc.netIsDebit?'debit':'credit'} (est.): $${lc.netAmount.toFixed(2)} x ${lc.qty}
+Max profit: ${lc.maxProfit==null?'Uncapped':'$'+lc.maxProfit.toFixed(0)}   Max loss: $${lc.maxLoss.toFixed(0)}
+Breakeven(s): ${lc.breakevens.length?lc.breakevens.map(b=>b.toFixed(2)).join(' / '):'—'}
+Built: ${new Date(lc.ts).toLocaleString()}`;
+  host.innerHTML = `
+    <div class="ticketbox">
+      <b>Trade ticket — copy into your exchange's own order screen</b>
+      <pre id="ticketText"></pre>
+      <div class="lp-row">
+        <button class="btn" id="copyTicket">Copy ticket text</button>
+        <a class="btn primary" href="${exLink}" target="_blank" rel="noopener">Open ${ccy||'exchange'} options on Deribit ↗</a>
+      </div>
+      <div class="macronote"><b>This site never asks for or stores a secret / trade-enabled API key.</b> It's a static, client-side-only page with no backend server — any secret key typed in here would travel through your browser and could be read via devtools or network traffic, so there is no safe way for a site like this to hold one. Use this ticket to place the order yourself on the exchange, where your key stays with the exchange's own authenticated session.</div>
+    </div>`;
+  document.getElementById('ticketText').textContent = text;
+  document.getElementById('copyTicket').onclick = async ()=>{
+    try{
+      await navigator.clipboard.writeText(text);
+      const btn = document.getElementById('copyTicket');
+      const orig = btn.textContent; btn.textContent = 'Copied ✓';
+      setTimeout(()=>{ btn.textContent = orig; }, 1600);
+    }catch(e){ alert('Could not copy automatically — select the text above and copy manually.'); }
+  };
+}
+
+/* ---------- Advanced Journal (auto-captures builder + live signal state; no manual data entry) ---------- */
+function getJournal(){
+  try{ return JSON.parse(localStorage.getItem('nvd_journal')||'[]'); }catch(e){ return []; }
+}
+function setJournal(arr){
+  try{ localStorage.setItem('nvd_journal', JSON.stringify(arr)); }catch(e){}
+}
+function logTrade(){
+  if(!lastCompute || !lastCompute.legs || !lastCompute.legs.length){
+    alert('Run the builder first (adjust a strike or premium) so there\'s a live structure to log.');
+    return;
+  }
+  const lc = lastCompute;
+  let verdict = null;
+  try{
+    if(signals && signals.ccy===lc.ccy && signals.markIv!=null) verdict = verdictFor(lc.stratId, signals);
+  }catch(e){ verdict = null; }
+  const entry = {
+    id: 'jt_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),
+    openedAt: lc.ts,
+    status: 'open',
+    stratId: lc.stratId, stratName: lc.stratName, asset: lc.asset, ccy: lc.ccy,
+    spot: lc.spot, qty: lc.qty, mult: lc.mult, legs: lc.legs,
+    maxProfit: lc.maxProfit, maxLoss: lc.maxLoss, breakevens: lc.breakevens,
+    netIsDebit: lc.netIsDebit, netAmount: lc.netAmount,
+    signalSnapshot: verdict ? {label: verdict.label, reason: verdict.reason} : null,
+    closedAt: null, exitSpot: null, realizedPnl: null
+  };
+  const arr = getJournal();
+  arr.unshift(entry);
+  setJournal(arr);
+  renderJournal();
+  const el = document.getElementById('journal');
+  if(el) el.scrollIntoView({behavior:'smooth', block:'start'});
+}
+function closeJournalEntry(id){
+  const arr = getJournal();
+  const idx = arr.findIndex(e=>e.id===id);
+  if(idx<0) return;
+  const exitSpot = parseFloat(prompt('Exit / current underlying price for this trade?', arr[idx].spot));
+  if(isNaN(exitSpot)) return;
+  const pnl = totalPnl(arr[idx].legs, exitSpot, arr[idx].qty, arr[idx].mult);
+  arr[idx].status = 'closed';
+  arr[idx].closedAt = Date.now();
+  arr[idx].exitSpot = exitSpot;
+  arr[idx].realizedPnl = pnl;
+  setJournal(arr);
+  renderJournal();
+}
+function deleteJournalEntry(id){
+  if(!confirm('Delete this journal entry? This cannot be undone.')) return;
+  setJournal(getJournal().filter(e=>e.id!==id));
+  renderJournal();
+}
+function exportJournalCSV(){
+  const arr = getJournal();
+  if(!arr.length){ alert('Journal is empty.'); return; }
+  const cols = ['openedAt','status','stratName','asset','ccy','spot','qty','maxProfit','maxLoss','netIsDebit','netAmount','closedAt','exitSpot','realizedPnl'];
+  const rows = [cols.join(',')].concat(arr.map(e=>cols.map(c=>{
+    let v = e[c]; if(v==null) v=''; if(c.endsWith('At') && v) v = new Date(v).toISOString();
+    return String(v).replace(/,/g,';');
+  }).join(',')));
+  const blob = new Blob([rows.join('\n')], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'nvd_journal.csv'; a.click();
+}
+function exportJournalJSON(){
+  const arr = getJournal();
+  if(!arr.length){ alert('Journal is empty.'); return; }
+  const blob = new Blob([JSON.stringify(arr, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'nvd_journal.json'; a.click();
+}
+function renderJournal(){
+  const host = document.getElementById('journalHost');
+  const sumHost = document.getElementById('journalSummary');
+  if(!host) return;
+  const arr = getJournal();
+  const closed = arr.filter(e=>e.status==='closed');
+  const wins = closed.filter(e=>e.realizedPnl>0).length;
+  const winRate = closed.length ? (wins/closed.length*100).toFixed(0)+'%' : '—';
+  const totalRealized = closed.reduce((s,e)=>s+(e.realizedPnl||0),0);
+  sumHost.innerHTML = `
+    <div class="jsumgrid">
+      <div class="kvcard"><small>Open trades</small><b>${arr.length-closed.length}</b></div>
+      <div class="kvcard"><small>Closed trades</small><b>${closed.length}</b></div>
+      <div class="kvcard"><small>Win rate</small><b>${winRate}</b></div>
+      <div class="kvcard"><small>Total realized P&amp;L</small><b class="${totalRealized>=0?'up':'dn'}">$${totalRealized.toFixed(0)}</b></div>
+    </div>`;
+  if(!arr.length){
+    host.innerHTML = `<div class="macronote">No trades logged yet. Build a structure above and click "Log this trade to Journal" — every field is captured automatically from the live builder and signal state, nothing is typed in by hand.</div>`;
+    return;
+  }
+  host.innerHTML = `
+    <table class="jtbl">
+      <thead><tr><th>Opened</th><th>Strategy</th><th>Asset</th><th>Legs</th><th>Max P / L</th><th>Status</th><th>Realized P&amp;L</th><th>Signal at entry</th><th></th></tr></thead>
+      <tbody>
+        ${arr.map(e=>`
+          <tr>
+            <td>${new Date(e.openedAt).toLocaleDateString()}</td>
+            <td>${e.stratName}</td>
+            <td>${(e.ccy||e.asset||'').toString().toUpperCase()}</td>
+            <td>${e.legs.length} leg${e.legs.length>1?'s':''}</td>
+            <td>${e.maxProfit==null?'Uncapped':'$'+e.maxProfit.toFixed(0)} / $${e.maxLoss.toFixed(0)}</td>
+            <td><span class="jstatus ${e.status==='closed'?'closed':''}">${e.status}</span></td>
+            <td class="jpl ${e.realizedPnl==null?'':(e.realizedPnl>=0?'up':'dn')}">${e.realizedPnl==null?'—':'$'+e.realizedPnl.toFixed(0)}</td>
+            <td>${e.signalSnapshot?e.signalSnapshot.label:'—'}</td>
+            <td>
+              ${e.status==='open'?`<button class="btn sm" data-close="${e.id}">Close</button>`:''}
+              <button class="btn sm" data-del="${e.id}">Delete</button>
+            </td>
+          </tr>`).join('')}
+      </tbody>
+    </table>`;
+  host.querySelectorAll('[data-close]').forEach(b=>b.onclick = ()=>closeJournalEntry(b.dataset.close));
+  host.querySelectorAll('[data-del]').forEach(b=>b.onclick = ()=>deleteJournalEntry(b.dataset.del));
+}
+function initTicketAndJournal(){
+  document.getElementById('buildTicket').onclick = buildTradeTicket;
+  document.getElementById('logTrade').onclick = logTrade;
+  document.getElementById('journalExportCsv').onclick = exportJournalCSV;
+  document.getElementById('journalExportJson').onclick = exportJournalJSON;
+  document.getElementById('journalClearAll').onclick = ()=>{
+    if(confirm('Delete the entire journal? This cannot be undone.')){ setJournal([]); renderJournal(); }
+  };
+  renderJournal();
+}
+
 (function initVersioning(){
   document.getElementById('verChip').textContent = `v${CURRENT_VERSION}`;
   let justUpdated = null;
@@ -1775,8 +2184,11 @@ renderVerdictContent();
 renderWatchlist();
 renderPredictionRadar();
 renderAcademyStrategies();
+renderStockNotes();
 initManualProtection();
 initMacroPanel();
+initCalendarPanels();
+initTicketAndJournal();
 </script>
 </body>
 </html>
