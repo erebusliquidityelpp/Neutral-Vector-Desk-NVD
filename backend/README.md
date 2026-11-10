@@ -25,8 +25,13 @@ Backend for [Neutral Vector Desk](https://erebusliquidityelpp.github.io/Neutral-
 
 ## Deploy on Railway
 
-1. Push this repo to GitHub (already done if you're reading this from the repo).
-2. In Railway: **New Project → Deploy from GitHub repo** → pick this repo.
+This backend lives in the `backend/` subfolder of the `neutral-vector-desk-nvd` repo, alongside
+the site's own `index.html` — it is not a separate repo.
+
+1. In Railway: **New Project → Deploy from GitHub repo** → pick `neutral-vector-desk-nvd`.
+2. On the new service, open **Settings → Source** and set **Root Directory** to `backend`.
+   Without this, Railway will try to build the whole repo (including `index.html`) as if it
+   were the backend, which will fail.
 3. **Add a plugin → Postgres.** Railway wires `DATABASE_URL` into your service automatically —
    you don't set it by hand.
 4. On the service, open **Variables** and set:
