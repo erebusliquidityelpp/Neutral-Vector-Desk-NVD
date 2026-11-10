@@ -337,9 +337,10 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
       <a href="#journal">Journal</a>
       <a href="#academy">Vocabulary &amp; Academy</a>
       <a href="#manual">Manual</a>
+      <a href="#apikeys">API Keys</a>
       <a href="#account">Account</a>
     </nav>
-    <span class="chip verchip" id="verChip">v2.5</span>
+    <span class="chip verchip" id="verChip">v2.6</span>
     <span class="chip" id="welcomeChip" style="display:none"></span>
     <button class="btn sm" id="globalRefresh">⟳ Refresh</button>
     <span class="chip"><span class="dot"></span> Client-side · no stored data</span>
@@ -852,6 +853,18 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
   </div>
 </section>
 
+<section id="apikeys" class="fullsection">
+  <div class="wrap">
+    <div class="shead">
+      <div class="kicker">API Keys</div>
+      <h3 class="stitle">Every market-data key, in one place</h3>
+      <p class="sdesc">Paste each provider's key once here and every live-data panel across the desk (Macro Fundamentals, Stocks, FX, Bonds) picks it up automatically — no need to re-enter it in each section. These are read-only market-data keys, stored only in this browser's local storage; for Stocks they're relayed through your own backend purely to avoid a browser CORS block, never stored there.</p>
+    </div>
+    <div class="livepanel gated" id="apiKeysPanel"></div>
+    <p class="gatenote">Sign in to manage your API keys.</p>
+  </div>
+</section>
+
 <section id="account">
   <div class="wrap">
     <div class="shead">
@@ -1208,7 +1221,7 @@ function drawChart(curve, spot, breakevens, minP, maxP){
 /* ---------- Asset tabs & live data ---------- */
 const ASSETS = [
   {id:'crypto', label:'Crypto', live:true},
-  {id:'stocks', label:'Stocks', live:false},
+  {id:'stocks', label:'Stocks', live:'partial'},
   {id:'forex', label:'Forex', live:'partial'},
   {id:'bonds', label:'Bonds', live:false}
 ];
@@ -1238,8 +1251,7 @@ function renderLivePanel(){
   const host = document.getElementById('livePanelHost');
   if(activeAsset==='crypto') return renderCryptoPanel(host);
   if(activeAsset==='forex') return renderForexPanel(host);
-  if(activeAsset==='stocks') return renderStubPanel(host,'Stocks','Tradier or Polygon.io','tradier',
-    'Once a key is set, this would call your provider\'s option-chain endpoint (e.g. Tradier GET /v1/markets/options/chains) for the symbol and expiry you pick, and auto-fill strikes/premiums the same way the Crypto tab does from Deribit. No key is wired in yet — nothing is faked or estimated.');
+  if(activeAsset==='stocks') return renderStocksPanel(host);
   if(activeAsset==='bonds') return renderStubPanel(host,'Bonds','a licensed feed (CME Market Data, dxFeed, etc.)','bonds',
     'Treasury and bond futures options trade on CME and settle through licensed market-data vendors — there is no free public feed. This tab is a placeholder for whichever vendor you eventually connect.');
 }
@@ -1401,6 +1413,55 @@ function initMacroPanel(){
   renderMacroStub(document.getElementById('macroHost'));
 }
 
+/* --- API Keys: centralized management for every market-data key on the desk --- */
+const API_KEY_FIELDS = [
+  {store:'macro', label:'Alpha Vantage', sub:'Macro Fundamentals — CPI, unemployment, Fed funds, 10Y yield', help:'Free key: alphavantage.co/support/#api-key'},
+  {store:'tradier', label:'Tradier', sub:'Stocks — live option chain (access token)', help:'Free developer sandbox: developer.tradier.com'},
+  {store:'polygon', label:'Polygon.io', sub:'Stocks — live option chain (alternative provider)', help:'Free tier: polygon.io/pricing'},
+  {store:'fx', label:'FX options provider', sub:'Optional — institutional OTC feed, only if you have one', help:''},
+  {store:'bonds', label:'Bonds vendor', sub:'CME Market Data / dxFeed, etc. — placeholder, not yet wired to a live call', help:''}
+];
+
+function renderApiKeysPanel(){
+  const host = document.getElementById('apiKeysPanel');
+  if(!host) return;
+  const keys = getKeys();
+  host.innerHTML = `
+    <div class="lp-head"><b>Saved keys</b><span class="lp-status"></span></div>
+    ${API_KEY_FIELDS.map(f=>`
+      <div class="lp-row" style="flex-wrap:wrap;align-items:flex-end">
+        <div class="field" style="flex:1;min-width:240px">
+          <label>${f.label} <span style="color:var(--muted);font-weight:400">— ${f.sub}</span></label>
+          <div class="pwdwrap"><input type="password" id="apikey-${f.store}" value="${(keys[f.store]||'').replace(/"/g,'&quot;')}" placeholder="paste key"><button type="button" class="pwdtoggle" data-for="apikey-${f.store}">Show</button></div>
+        </div>
+        <button class="btn" id="apikeysave-${f.store}">Save</button>
+        <span class="lp-status" id="apikeystatus-${f.store}"><span class="ld ${keys[f.store]?'ok':''}"></span>${keys[f.store]?'Saved':'Not set'}</span>
+      </div>
+      ${f.help?`<div class="note" style="margin-top:-6px;margin-bottom:4px">${f.help}</div>`:''}
+    `).join('')}
+    <div class="lp-row" style="margin-top:4px">
+      <div class="field"><label>Preferred Stocks provider (when both are saved)</label>
+        <select id="stocksProviderSel">
+          <option value="tradier" ${keys.stocksProviderPref!=='polygon'?'selected':''}>Tradier</option>
+          <option value="polygon" ${keys.stocksProviderPref==='polygon'?'selected':''}>Polygon.io</option>
+        </select>
+      </div>
+    </div>
+    <div class="note">Exchange trading keys (Hyperliquid, Binance, etc. — used for real order execution) live in a separate, encrypted server-side vault. Manage those in the Account section below, not here.</div>
+  `;
+  API_KEY_FIELDS.forEach(f=>{
+    document.getElementById(`apikeysave-${f.store}`).addEventListener('click', ()=>{
+      const val = document.getElementById(`apikey-${f.store}`).value.trim();
+      setKey(f.store, val);
+      const st = document.getElementById(`apikeystatus-${f.store}`);
+      st.innerHTML = `<span class="ld ${val?'ok':''}"></span>${val?'Saved':'Not set'}`;
+    });
+  });
+  document.getElementById('stocksProviderSel').addEventListener('change', (e)=>{
+    setKey('stocksProviderPref', e.target.value);
+  });
+}
+
 /* --- Options expiry calendar: live, free, Deribit --- */
 async function fetchExpiryCalendar(){
   const host = document.getElementById('expiryHost');
@@ -1497,6 +1558,8 @@ function initCalendarPanels(){
 
 /* --- Crypto: live option chain via Deribit public API (free, no key) --- */
 let deribitCache = {instruments:null, ccy:null};
+let stockCache = {};
+let lastStockSymbol = '';
 
 function renderCryptoPanel(host){
   host.innerHTML = `
@@ -1624,6 +1687,158 @@ function applyLegsToForm(legsWithPrem, spot){
     row.querySelector('.premium').value = l.premiumUsd.toFixed(2);
   });
   compute();
+}
+
+/* --- Stocks: live option chain via Tradier or Polygon.io (user's own key, proxied through your backend) --- */
+function stocksProvider(){
+  const keys = getKeys();
+  if(keys.stocksProviderPref==='polygon' && keys.polygon) return 'polygon';
+  if(keys.stocksProviderPref==='tradier' && keys.tradier) return 'tradier';
+  if(keys.tradier) return 'tradier';
+  if(keys.polygon) return 'polygon';
+  return null;
+}
+
+function renderStocksPanel(host){
+  const provider = stocksProvider();
+  host.innerHTML = `
+    <div class="livepanel">
+      <div class="lp-head">
+        <b>Stocks — live option chain</b>
+        <span class="lp-status" id="stkStatus"><span class="ld"></span>Idle</span>
+      </div>
+      <div class="lp-row" style="flex-wrap:wrap">
+        <div class="field"><label>Symbol</label><input type="text" id="stkSymbol" placeholder="AAPL" style="text-transform:uppercase" value="${lastStockSymbol||''}"></div>
+        <button class="btn primary" id="stkFetch">Load expiries</button>
+        <div class="field" id="stkExpiryWrap" style="display:none"><label>Expiry</label><select id="stkExpiry"></select></div>
+        <button class="btn" id="stkLoadLegs" style="display:none">Load live strikes into builder</button>
+      </div>
+      <div class="note">${provider ? `Using your saved <b>${provider==='tradier'?'Tradier':'Polygon.io'}</b> key (manage it in <a href="#apikeys">API Keys</a>).` : `No Tradier or Polygon.io key saved yet — add one in <a href="#apikeys">API Keys</a> to enable this.`} Requires your backend (Account section) to be connected, since the key is relayed through your own server to avoid a browser CORS block. Contract multiplier is set to 100 automatically (standard US equity option sizing). Straddle/strangle/condor/butterfly are supported from a live chain; calendar needs a second expiry this panel doesn't fetch yet, so it loads flat ATM legs as a starting point — adjust manually.</div>
+    </div>`;
+  document.getElementById('stkFetch').addEventListener('click', fetchStockExpiries);
+  document.getElementById('stkLoadLegs').addEventListener('click', loadStockLegs);
+}
+
+async function fetchStockExpiries(){
+  const st = document.getElementById('stkStatus');
+  const symbol = document.getElementById('stkSymbol').value.trim().toUpperCase();
+  if(!symbol){ st.innerHTML = `<span class="ld err"></span>Enter a symbol`; return; }
+  lastStockSymbol = symbol;
+  const provider = stocksProvider();
+  if(!provider){ st.innerHTML = `<span class="ld err"></span>No Tradier or Polygon.io key saved — add one in API Keys`; return; }
+  const key = getKeys()[provider];
+  st.innerHTML = `<span class="ld"></span>Loading…`;
+  try{
+    let expirations;
+    if(provider==='tradier'){
+      const data = await apiFetch(`/proxy/tradier/v1/markets/options/expirations?symbol=${symbol}&includeAllRoots=true`, {headers:{'x-provider-key':key}});
+      const exp = data.expirations && data.expirations.date;
+      expirations = Array.isArray(exp) ? exp : (exp ? [exp] : []);
+    } else {
+      const data = await apiFetch(`/proxy/polygon/v3/reference/options/contracts?underlying_ticker=${symbol}&limit=1000&order=asc&sort=expiration_date`, {headers:{'x-provider-key':key}});
+      const dates = (data.results||[]).map(c=>c.expiration_date);
+      expirations = [...new Set(dates)].sort();
+    }
+    if(!expirations.length){ st.innerHTML = `<span class="ld err"></span>No option expirations found for ${symbol}`; return; }
+    stockCache[symbol] = {provider, expirations};
+    const expSel = document.getElementById('stkExpiry');
+    expSel.innerHTML = expirations.map(d=>`<option value="${d}">${d}</option>`).join('');
+    document.getElementById('stkExpiryWrap').style.display='flex';
+    document.getElementById('stkLoadLegs').style.display='inline-flex';
+    st.innerHTML = `<span class="ld ok"></span>${expirations.length} expiries loaded for ${symbol}`;
+  }catch(e){
+    st.innerHTML = `<span class="ld err"></span>${e.message}`;
+  }
+}
+
+function applyStockLegsToForm(legsWithPrem, spot){
+  document.getElementById('spot').value = spot.toFixed(2);
+  document.getElementById('multiplier').value = 100;
+  legsWithPrem.forEach(l=>{
+    const row = document.querySelector(`.legrow[data-leg="${l.key}"]`);
+    if(!row) return;
+    row.querySelector('.strike').value = l.strike;
+    row.querySelector('.premium').value = l.premiumUsd.toFixed(2);
+  });
+  compute();
+}
+
+async function loadStockLegs(){
+  const st = document.getElementById('stkStatus');
+  const symbol = lastStockSymbol;
+  const expiry = document.getElementById('stkExpiry').value;
+  const cache = stockCache[symbol];
+  if(!cache){ st.innerHTML = `<span class="ld err"></span>Load expiries first`; return; }
+  const provider = cache.provider;
+  const key = getKeys()[provider];
+  st.innerHTML = `<span class="ld"></span>Fetching chain…`;
+  try{
+    let strikesArr, premiumFor, spot;
+    if(provider==='tradier'){
+      const [quoteData, chainData] = await Promise.all([
+        apiFetch(`/proxy/tradier/v1/markets/quotes?symbols=${symbol}`, {headers:{'x-provider-key':key}}),
+        apiFetch(`/proxy/tradier/v1/markets/options/chains?symbol=${symbol}&expiration=${expiry}&greeks=false`, {headers:{'x-provider-key':key}})
+      ]);
+      const q = quoteData.quotes && quoteData.quotes.quote;
+      spot = Array.isArray(q) ? q[0].last : (q ? q.last : null);
+      const opts = (chainData.options && chainData.options.option) || [];
+      const list = Array.isArray(opts) ? opts : [opts];
+      strikesArr = [...new Set(list.map(o=>o.strike))].sort((a,b)=>a-b);
+      premiumFor = (strike,type)=>{
+        const o = list.find(x=>x.strike===strike && x.option_type===type);
+        if(!o) return null;
+        if(o.bid>0 && o.ask>0) return (o.bid+o.ask)/2;
+        return o.last || null;
+      };
+    } else {
+      const [aggData, chainData] = await Promise.all([
+        apiFetch(`/proxy/polygon/v2/aggs/ticker/${symbol}/prev`, {headers:{'x-provider-key':key}}),
+        apiFetch(`/proxy/polygon/v3/snapshot/options/${symbol}?expiration_date=${expiry}&limit=250`, {headers:{'x-provider-key':key}})
+      ]);
+      spot = aggData.results && aggData.results[0] ? aggData.results[0].c : null;
+      const list = (chainData.results||[]).map(r=>({
+        strike: r.details.strike_price,
+        option_type: r.details.contract_type,
+        bid: r.last_quote ? r.last_quote.bid : null,
+        ask: r.last_quote ? r.last_quote.ask : null,
+        last: r.day ? r.day.close : null
+      }));
+      strikesArr = [...new Set(list.map(o=>o.strike))].sort((a,b)=>a-b);
+      premiumFor = (strike,type)=>{
+        const o = list.find(x=>x.strike===strike && x.option_type===type);
+        if(!o) return null;
+        if(o.bid>0 && o.ask>0) return (o.bid+o.ask)/2;
+        return o.last || null;
+      };
+    }
+    if(!spot || !strikesArr.length){ st.innerHTML = `<span class="ld err"></span>No usable chain data returned for that expiry`; return; }
+
+    const atm = nearest(strikesArr, spot);
+    const idx = strikesArr.indexOf(atm);
+    let plan;
+    if(current.id==='straddle'){
+      plan = [{key:'legA',type:'call',strike:atm},{key:'legB',type:'put',strike:atm}];
+    } else if(current.id==='strangle'){
+      const upS = strikesArr[Math.min(idx+2,strikesArr.length-1)], dnS = strikesArr[Math.max(idx-2,0)];
+      plan = [{key:'legA',type:'call',strike:upS},{key:'legB',type:'put',strike:dnS}];
+    } else if(current.id==='condor'){
+      const sC=strikesArr[Math.min(idx+2,strikesArr.length-1)], bC=strikesArr[Math.min(idx+4,strikesArr.length-1)];
+      const sP=strikesArr[Math.max(idx-2,0)], bP=strikesArr[Math.max(idx-4,0)];
+      plan = [{key:'legA',type:'call',strike:sC},{key:'legB',type:'call',strike:bC},{key:'legC',type:'put',strike:sP},{key:'legD',type:'put',strike:bP}];
+    } else if(current.id==='butterfly'){
+      const wC=strikesArr[Math.min(idx+3,strikesArr.length-1)], wP=strikesArr[Math.max(idx-3,0)];
+      plan = [{key:'legA',type:'call',strike:atm},{key:'legB',type:'call',strike:wC},{key:'legC',type:'put',strike:atm},{key:'legD',type:'put',strike:wP}];
+    } else {
+      plan = [{key:'legA',type:'call',strike:atm},{key:'legB',type:'call',strike:atm}];
+    }
+
+    const withPrem = plan.map(p=>({key:p.key, strike:p.strike, premiumUsd: premiumFor(p.strike,p.type)})).filter(p=>p.premiumUsd!=null);
+    if(!withPrem.length){ st.innerHTML = `<span class="ld err"></span>Could not match live premiums for this expiry`; return; }
+    applyStockLegsToForm(withPrem, spot);
+    st.innerHTML = `<span class="ld ok"></span>Loaded live ${symbol} ${current.name} @ ${expiry} — spot ${spot.toFixed(2)}`;
+  }catch(e){
+    st.innerHTML = `<span class="ld err"></span>${e.message}`;
+  }
 }
 
 /* ---------- Market Signal Verdicts (all free, no key) ---------- */
@@ -2125,7 +2340,7 @@ function renderVerdictContent(){
 document.getElementById('vbRefresh').addEventListener('click', refreshSignals);
 
 /* ---------- Version check / update button ---------- */
-const CURRENT_VERSION = "2.5";
+const CURRENT_VERSION = "2.6";
 let updateAvailable = null; // set to remote version string when a newer one is seen
 
 async function doRefreshData(){
@@ -2652,6 +2867,7 @@ initMacroPanel();
 initCalendarPanels();
 initTicketAndJournal();
 initAccountPanel();
+renderApiKeysPanel();
 </script>
 </body>
 </html>

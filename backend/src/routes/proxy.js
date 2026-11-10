@@ -50,4 +50,41 @@ router.get('/bls/:series', async (req, res) => {
   }
 });
 
+// Tradier and Polygon.io: the user's OWN market-data key, supplied per-request via the
+// x-provider-key header, never stored server-side. This exists only to route around
+// browser CORS — the upstream host is hardcoded, so this can't be used as an open relay.
+router.get('/tradier/*', async (req, res) => {
+  const token = req.get('x-provider-key');
+  if (!token) return res.status(400).json({ error: 'Missing x-provider-key header (your Tradier access token).' });
+  const upstreamPath = req.params[0];
+  if (!/^[\w./-]+$/.test(upstreamPath)) return res.status(400).json({ error: 'Invalid path.' });
+  const env = req.query.env === 'production' ? 'api' : 'sandbox';
+  const qs = (req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '').replace(/[?&]env=(sandbox|production)/, '');
+  const url = `https://${env}.tradier.com/${upstreamPath}${qs}`;
+  try {
+    const r = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } });
+    const body = await r.text();
+    res.status(r.status).type(r.headers.get('content-type') || 'application/json').send(body);
+  } catch (e) {
+    res.status(502).json({ error: 'Tradier upstream request failed.' });
+  }
+});
+
+router.get('/polygon/*', async (req, res) => {
+  const key = req.get('x-provider-key');
+  if (!key) return res.status(400).json({ error: 'Missing x-provider-key header (your Polygon.io API key).' });
+  const upstreamPath = req.params[0];
+  if (!/^[\w./-]+$/.test(upstreamPath)) return res.status(400).json({ error: 'Invalid path.' });
+  const qs = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+  const sep = qs ? '&' : '?';
+  const url = `https://api.polygon.io/${upstreamPath}${qs}${sep}apiKey=${encodeURIComponent(key)}`;
+  try {
+    const r = await fetch(url);
+    const body = await r.text();
+    res.status(r.status).type(r.headers.get('content-type') || 'application/json').send(body);
+  } catch (e) {
+    res.status(502).json({ error: 'Polygon.io upstream request failed.' });
+  }
+});
+
 module.exports = router;
