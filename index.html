@@ -340,7 +340,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
       <a href="#apikeys">API Keys</a>
       <a href="#account">Account</a>
     </nav>
-    <span class="chip verchip" id="verChip">v2.7</span>
+    <span class="chip verchip" id="verChip">v2.8</span>
     <span class="chip" id="welcomeChip" style="display:none"></span>
     <button class="btn sm" id="globalRefresh">⟳ Refresh</button>
     <span class="chip"><span class="dot"></span> Client-side · no stored data</span>
@@ -1451,14 +1451,21 @@ function renderApiKeysPanel(){
       </div>
       ${f.help?`<div class="note" style="margin-top:-6px;margin-bottom:4px">${f.help}</div>`:''}
     `).join('')}
-    <div class="lp-row" style="margin-top:4px">
+    <div class="lp-row" style="margin-top:4px;flex-wrap:wrap">
       <div class="field"><label>Preferred Stocks provider (when both are saved)</label>
         <select id="stocksProviderSel">
           <option value="tradier" ${keys.stocksProviderPref!=='polygon'?'selected':''}>Tradier</option>
           <option value="polygon" ${keys.stocksProviderPref==='polygon'?'selected':''}>Polygon.io</option>
         </select>
       </div>
+      <div class="field"><label>Tradier token type</label>
+        <select id="tradierEnvSel">
+          <option value="sandbox" ${keys.tradierEnv!=='production'?'selected':''}>Sandbox (developer.tradier.com free token)</option>
+          <option value="production" ${keys.tradierEnv==='production'?'selected':''}>Production (live brokerage account)</option>
+        </select>
+      </div>
     </div>
+    <div class="note">A Tradier sandbox token only works against Tradier's sandbox host, and a production token only against the live host — a 401 "Request failed" on the Stocks tab usually means this is set to the wrong one for the token you pasted above.</div>
     <div class="note">Exchange trading keys (Hyperliquid, Binance, etc. — used for real order execution) live in a separate, encrypted server-side vault. Manage those in the Account section below, not here.</div>
   `;
   API_KEY_FIELDS.forEach(f=>{
@@ -1471,6 +1478,9 @@ function renderApiKeysPanel(){
   });
   document.getElementById('stocksProviderSel').addEventListener('change', (e)=>{
     setKey('stocksProviderPref', e.target.value);
+  });
+  document.getElementById('tradierEnvSel').addEventListener('change', (e)=>{
+    setKey('tradierEnv', e.target.value);
   });
 }
 
@@ -1710,6 +1720,9 @@ function stocksProvider(){
   if(keys.polygon) return 'polygon';
   return null;
 }
+function tradierEnvParam(){
+  return getKeys().tradierEnv==='production' ? 'production' : 'sandbox';
+}
 
 function renderStocksPanel(host){
   const provider = stocksProvider();
@@ -1720,15 +1733,47 @@ function renderStocksPanel(host){
         <span class="lp-status" id="stkStatus"><span class="ld"></span>Idle</span>
       </div>
       <div class="lp-row" style="flex-wrap:wrap">
-        <div class="field"><label>Symbol</label><input type="text" id="stkSymbol" placeholder="AAPL" style="text-transform:uppercase" value="${lastStockSymbol||''}"></div>
+        <div class="field"><label>Symbol</label><input type="text" id="stkSymbol" list="stkSymbolList" autocomplete="off" placeholder="Type a ticker or company name" style="text-transform:uppercase" value="${lastStockSymbol||''}"><datalist id="stkSymbolList"></datalist></div>
         <button class="btn primary" id="stkFetch">Load expiries</button>
         <div class="field" id="stkExpiryWrap" style="display:none"><label>Expiry</label><select id="stkExpiry"></select></div>
         <button class="btn" id="stkLoadLegs" style="display:none">Load live strikes into builder</button>
       </div>
-      <div class="note">${provider ? `Using your saved <b>${provider==='tradier'?'Tradier':'Polygon.io'}</b> key (manage it in <a href="#apikeys">API Keys</a>).` : `No Tradier or Polygon.io key saved yet — add one in <a href="#apikeys">API Keys</a> to enable this.`} Requires your backend (Account section) to be connected, since the key is relayed through your own server to avoid a browser CORS block. Contract multiplier is set to 100 automatically (standard US equity option sizing). Straddle/strangle/condor/butterfly are supported from a live chain; calendar needs a second expiry this panel doesn't fetch yet, so it loads flat ATM legs as a starting point — adjust manually.</div>
+      <div class="note">${provider ? `Using your saved <b>${provider==='tradier'?'Tradier':'Polygon.io'}</b> key (manage it in <a href="#apikeys">API Keys</a>).` : `No Tradier or Polygon.io key saved yet — add one in <a href="#apikeys">API Keys</a> to enable this.`} Requires your backend (Account section) to be connected, since the key is relayed through your own server to avoid a browser CORS block. Contract multiplier is set to 100 automatically (standard US equity option sizing). Straddle/strangle/condor/butterfly are supported from a live chain; calendar needs a second expiry this panel doesn't fetch yet, so it loads flat ATM legs as a starting point — adjust manually. Start typing a ticker or company name for suggestions.</div>
     </div>`;
   document.getElementById('stkFetch').addEventListener('click', fetchStockExpiries);
   document.getElementById('stkLoadLegs').addEventListener('click', loadStockLegs);
+  wireStockSymbolAutocomplete();
+}
+
+let stkSearchDebounce = null;
+function wireStockSymbolAutocomplete(){
+  const input = document.getElementById('stkSymbol');
+  if(!input) return;
+  input.addEventListener('input', ()=>{
+    clearTimeout(stkSearchDebounce);
+    const q = input.value.trim();
+    if(q.length<1) return;
+    stkSearchDebounce = setTimeout(()=>searchStockSymbols(q), 350);
+  });
+}
+async function searchStockSymbols(q){
+  const provider = stocksProvider();
+  const list = document.getElementById('stkSymbolList');
+  if(!provider || !list || !apiBase) return;
+  const key = getKeys()[provider];
+  try{
+    let results = [];
+    if(provider==='tradier'){
+      const data = await apiFetch(`/proxy/tradier/v1/markets/search?q=${encodeURIComponent(q)}&indexes=false&env=${tradierEnvParam()}`, {headers:{'x-provider-key':key}});
+      const secs = data.securities && data.securities.security;
+      const arr = Array.isArray(secs) ? secs : (secs ? [secs] : []);
+      results = arr.slice(0,12).map(s=>({symbol:s.symbol, name:s.description}));
+    } else {
+      const data = await apiFetch(`/proxy/polygon/v3/reference/tickers?search=${encodeURIComponent(q)}&active=true&market=stocks&limit=12`, {headers:{'x-provider-key':key}});
+      results = (data.results||[]).map(r=>({symbol:r.ticker, name:r.name}));
+    }
+    list.innerHTML = results.filter(r=>r.symbol).map(r=>`<option value="${r.symbol}">${(r.name||'').replace(/"/g,'&quot;')}</option>`).join('');
+  }catch(e){ /* autocomplete is a convenience — fail silently, manual typing still works */ }
 }
 
 async function fetchStockExpiries(){
@@ -1743,7 +1788,7 @@ async function fetchStockExpiries(){
   try{
     let expirations;
     if(provider==='tradier'){
-      const data = await apiFetch(`/proxy/tradier/v1/markets/options/expirations?symbol=${symbol}&includeAllRoots=true`, {headers:{'x-provider-key':key}});
+      const data = await apiFetch(`/proxy/tradier/v1/markets/options/expirations?symbol=${symbol}&includeAllRoots=true&env=${tradierEnvParam()}`, {headers:{'x-provider-key':key}});
       const exp = data.expirations && data.expirations.date;
       expirations = Array.isArray(exp) ? exp : (exp ? [exp] : []);
     } else {
@@ -1788,8 +1833,8 @@ async function loadStockLegs(){
     let list, strikesArr, premiumFor, spot;
     if(provider==='tradier'){
       const [quoteData, chainData] = await Promise.all([
-        apiFetch(`/proxy/tradier/v1/markets/quotes?symbols=${symbol}`, {headers:{'x-provider-key':key}}),
-        apiFetch(`/proxy/tradier/v1/markets/options/chains?symbol=${symbol}&expiration=${expiry}&greeks=true`, {headers:{'x-provider-key':key}})
+        apiFetch(`/proxy/tradier/v1/markets/quotes?symbols=${symbol}&env=${tradierEnvParam()}`, {headers:{'x-provider-key':key}}),
+        apiFetch(`/proxy/tradier/v1/markets/options/chains?symbol=${symbol}&expiration=${expiry}&greeks=true&env=${tradierEnvParam()}`, {headers:{'x-provider-key':key}})
       ]);
       const q = quoteData.quotes && quoteData.quotes.quote;
       spot = Array.isArray(q) ? q[0].last : (q ? q.last : null);
@@ -1862,7 +1907,7 @@ async function fetchStockRealizedVol(symbol, provider, key){
     const fmt = d=>d.toISOString().slice(0,10);
     let closes;
     if(provider==='tradier'){
-      const data = await apiFetch(`/proxy/tradier/v1/markets/history?symbol=${symbol}&interval=daily&start=${fmt(start)}&end=${fmt(end)}`, {headers:{'x-provider-key':key}});
+      const data = await apiFetch(`/proxy/tradier/v1/markets/history?symbol=${symbol}&interval=daily&start=${fmt(start)}&end=${fmt(end)}&env=${tradierEnvParam()}`, {headers:{'x-provider-key':key}});
       const days = data.history && data.history.day;
       const list = Array.isArray(days) ? days : (days ? [days] : []);
       closes = list.map(d=>d.close);
@@ -2450,7 +2495,7 @@ function renderVerdictContent(){
 document.getElementById('vbRefresh').addEventListener('click', refreshSignals);
 
 /* ---------- Version check / update button ---------- */
-const CURRENT_VERSION = "2.7";
+const CURRENT_VERSION = "2.8";
 let updateAvailable = null; // set to remote version string when a newer one is seen
 
 async function doRefreshData(){
@@ -2745,6 +2790,16 @@ let authToken = (()=>{ try{ return localStorage.getItem('nvd_token')||''; }catch
 let authUser = (()=>{ try{ return JSON.parse(localStorage.getItem('nvd_user')||'null'); }catch(e){ return null; } })();
 let myKeys = [];
 
+function extractApiError(body, status){
+  if(!body) return `Request failed (${status})`;
+  if(typeof body === 'string') return body.slice(0,200);
+  if(body.error) return typeof body.error === 'string' ? body.error : JSON.stringify(body.error);
+  if(body.fault && body.fault.faultstring) return `${body.fault.faultstring} (upstream ${status})`; // Tradier/Apigee-style
+  if(body.errors && Array.isArray(body.errors) && body.errors.length) return JSON.stringify(body.errors[0]);
+  if(body.message) return body.message;
+  try{ const s = JSON.stringify(body); if(s && s!=='{}') return `${s.slice(0,200)} (upstream ${status})`; }catch(e){}
+  return `Request failed (${status})`;
+}
 async function apiFetch(path, opts={}){
   if(!apiBase) throw new Error('Backend URL not set — save it above first.');
   const headers = Object.assign({'Content-Type':'application/json'}, opts.headers||{});
@@ -2752,7 +2807,7 @@ async function apiFetch(path, opts={}){
   const res = await fetch(apiBase.replace(/\/$/,'') + path, Object.assign({}, opts, {headers}));
   let body = null;
   try{ body = await res.json(); }catch(e){}
-  if(!res.ok) throw new Error((body&&body.error)||`Request failed (${res.status})`);
+  if(!res.ok) throw new Error(extractApiError(body, res.status));
   return body;
 }
 
