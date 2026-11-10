@@ -87,4 +87,86 @@ router.get('/polygon/*', async (req, res) => {
   }
 });
 
+// --- Free/public RSS news aggregation -------------------------------------------------
+// No API key, no paywall: this fetches real RSS feeds from real news publishers
+// server-side (their hosts don't send CORS headers, so the browser can't fetch them
+// directly) and returns parsed JSON. Fixed allowlist of named feeds only — never an
+// open "fetch any URL" relay, same pattern as the routes above.
+const RSS_FEEDS = {
+  cointelegraph: { url: 'https://cointelegraph.com/rss', source: 'Cointelegraph' },
+  coindesk: { url: 'https://www.coindesk.com/arc/outboundfeeds/rss/?outputType=xml', source: 'CoinDesk' },
+  marketwatch_top: { url: 'https://feeds.marketwatch.com/marketwatch/topstories', source: 'MarketWatch' },
+  marketwatch_bulletins: { url: 'https://feeds.marketwatch.com/marketwatch/bulletins', source: 'MarketWatch' },
+  seekingalpha: { url: 'https://seekingalpha.com/feed.xml', source: 'Seeking Alpha' },
+  investing_stocks: { url: 'https://www.investing.com/rss/news_25.rss', source: 'Investing.com' },
+  investing_forex: { url: 'https://www.investing.com/rss/news_1.rss', source: 'Investing.com' },
+  investing_economy: { url: 'https://www.investing.com/rss/news_14.rss', source: 'Investing.com' },
+  investing_indicators: { url: 'https://www.investing.com/rss/news_95.rss', source: 'Investing.com' },
+  investing_earnings: { url: 'https://www.investing.com/rss/news_1062.rss', source: 'Investing.com' },
+  investing_crypto: { url: 'https://www.investing.com/rss/news_301.rss', source: 'Investing.com' }
+};
+
+function rssExtractTag(block, tag) {
+  const re = new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i');
+  const m = re.exec(block);
+  if (!m) return '';
+  let v = m[1].trim();
+  const cdata = /^<!\[CDATA\[([\s\S]*?)\]\]>$/.exec(v);
+  if (cdata) v = cdata[1].trim();
+  return v;
+}
+function rssDecodeEntities(s) {
+  return String(s)
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&apos;/g, "'")
+    .replace(/<[^>]+>/g, '').trim();
+}
+function parseRssXml(xml, source) {
+  const items = [];
+  const itemRe = /<item\b[^>]*>([\s\S]*?)<\/item>/gi;
+  let m;
+  while ((m = itemRe.exec(xml)) && items.length < 20) {
+    const block = m[1];
+    const title = rssExtractTag(block, 'title');
+    const link = rssExtractTag(block, 'link');
+    const pubDate = rssExtractTag(block, 'pubDate') || rssExtractTag(block, 'dc:date') || rssExtractTag(block, 'published');
+    if (title) items.push({ title: rssDecodeEntities(title), link: link.trim(), pubDate: pubDate.trim(), source });
+  }
+  return items;
+}
+async function fetchRssFeed(feed) {
+  try {
+    const r = await fetch(feed.url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+        'Accept': 'application/rss+xml, application/xml, text/xml, */*'
+      }
+    });
+    if (!r.ok) return { ok: false, error: `Upstream returned ${r.status}`, items: [] };
+    const xml = await r.text();
+    return { ok: true, source: feed.source, items: parseRssXml(xml, feed.source) };
+  } catch (e) {
+    return { ok: false, error: 'Upstream request failed.', items: [] };
+  }
+}
+
+router.get('/rss/:feedId', async (req, res) => {
+  const feed = RSS_FEEDS[req.params.feedId];
+  if (!feed) return res.status(400).json({ error: 'Unknown feed id.' });
+  res.json(await fetchRssFeed(feed));
+});
+
+// Fetch several named feeds in parallel and return them together — the frontend uses
+// this one route per news category so it can merge 2+ real, independent publishers.
+router.get('/rss-multi/:feedIds', async (req, res) => {
+  const ids = req.params.feedIds.split(',').map(s => s.trim()).filter(Boolean).slice(0, 6);
+  const results = await Promise.all(ids.map(async (id) => {
+    const feed = RSS_FEEDS[id];
+    if (!feed) return { id, ok: false, error: 'Unknown feed id.', items: [] };
+    const r = await fetchRssFeed(feed);
+    return { id, ...r };
+  }));
+  res.json({ results });
+});
+
 module.exports = router;
