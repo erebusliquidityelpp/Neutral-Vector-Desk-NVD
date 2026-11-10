@@ -340,7 +340,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
       <a href="#apikeys">API Keys</a>
       <a href="#account">Account</a>
     </nav>
-    <span class="chip verchip" id="verChip">v2.9</span>
+    <span class="chip verchip" id="verChip">v2.10</span>
     <span class="chip" id="welcomeChip" style="display:none"></span>
     <button class="btn sm" id="globalRefresh">⟳ Refresh</button>
     <span class="chip"><span class="dot"></span> Client-side · no stored data</span>
@@ -1427,9 +1427,9 @@ function initMacroPanel(){
 
 /* --- API Keys: centralized management for every market-data key on the desk --- */
 const API_KEY_FIELDS = [
-  {store:'macro', label:'Alpha Vantage', sub:'Macro Fundamentals — CPI, unemployment, Fed funds, 10Y yield', help:'Free key: alphavantage.co/support/#api-key'},
-  {store:'tradier', label:'Tradier', sub:'Stocks — live option chain (access token)', help:'Free developer sandbox: developer.tradier.com'},
-  {store:'polygon', label:'Polygon.io', sub:'Stocks — live option chain (alternative provider)', help:'Free tier: polygon.io/pricing'},
+  {store:'macro', label:'Alpha Vantage', sub:'Macro Fundamentals, and Stocks — live option chain (recommended: free, no US-residency signup, options included on the free tier)', help:'Free key: alphavantage.co/support/#api-key'},
+  {store:'tradier', label:'Tradier', sub:'Stocks — live option chain (access token; sandbox signup requires a US address)', help:'Free developer sandbox: developer.tradier.com'},
+  {store:'polygon', label:'Polygon.io', sub:'Stocks — live option chain (free tier does NOT include options data — needs a paid plan)', help:'Free tier: polygon.io/pricing'},
   {store:'fx', label:'FX options provider', sub:'Optional — institutional OTC feed, only if you have one', help:''},
   {store:'bonds', label:'Bonds vendor', sub:'CME Market Data / dxFeed, etc. — placeholder, not yet wired to a live call', help:''}
 ];
@@ -1452,9 +1452,10 @@ function renderApiKeysPanel(){
       ${f.help?`<div class="note" style="margin-top:-6px;margin-bottom:4px">${f.help}</div>`:''}
     `).join('')}
     <div class="lp-row" style="margin-top:4px;flex-wrap:wrap">
-      <div class="field"><label>Preferred Stocks provider (when both are saved)</label>
+      <div class="field"><label>Preferred Stocks provider (when more than one is saved)</label>
         <select id="stocksProviderSel">
-          <option value="tradier" ${keys.stocksProviderPref!=='polygon'?'selected':''}>Tradier</option>
+          <option value="alphavantage" ${!keys.stocksProviderPref||keys.stocksProviderPref==='alphavantage'?'selected':''}>Alpha Vantage</option>
+          <option value="tradier" ${keys.stocksProviderPref==='tradier'?'selected':''}>Tradier</option>
           <option value="polygon" ${keys.stocksProviderPref==='polygon'?'selected':''}>Polygon.io</option>
         </select>
       </div>
@@ -1716,9 +1717,14 @@ function stocksProvider(){
   const keys = getKeys();
   if(keys.stocksProviderPref==='polygon' && keys.polygon) return 'polygon';
   if(keys.stocksProviderPref==='tradier' && keys.tradier) return 'tradier';
+  if(keys.stocksProviderPref==='alphavantage' && keys.macro) return 'alphavantage';
+  if(keys.macro) return 'alphavantage';
   if(keys.tradier) return 'tradier';
   if(keys.polygon) return 'polygon';
   return null;
+}
+function stockProviderKey(provider){
+  return provider==='alphavantage' ? getKeys().macro : getKeys()[provider];
 }
 function tradierEnvParam(){
   return getKeys().tradierEnv==='production' ? 'production' : 'sandbox';
@@ -1738,7 +1744,7 @@ function renderStocksPanel(host){
         <div class="field" id="stkExpiryWrap" style="display:none"><label>Expiry</label><select id="stkExpiry"></select></div>
         <button class="btn" id="stkLoadLegs" style="display:none">Load live strikes into builder</button>
       </div>
-      <div class="note">${provider ? `Using your saved <b>${provider==='tradier'?'Tradier':'Polygon.io'}</b> key (manage it in <a href="#apikeys">API Keys</a>).` : `No Tradier or Polygon.io key saved yet — add one in <a href="#apikeys">API Keys</a> to enable this.`} Requires your backend (Account section) to be connected, since the key is relayed through your own server to avoid a browser CORS block. Contract multiplier is set to 100 automatically (standard US equity option sizing). 14 of the 17 structures map onto the live chain (each strike auto-placed at that structure's usual %-OTM distance from spot); Calendar, Diagonal and Double Calendar need a second expiry this panel doesn't fetch yet. Start typing a ticker or company name for suggestions.</div>
+      <div class="note">${provider ? `Using your saved <b>${provider==='alphavantage'?'Alpha Vantage':provider==='tradier'?'Tradier':'Polygon.io'}</b> key (manage it in <a href="#apikeys">API Keys</a>).${provider==='alphavantage'?' Alpha Vantage returns the most recent trading session\'s full chain (not a live tick) and needs no backend connection — it\'s fetched straight from your browser.':' Requires your backend (Account section) to be connected, since the key is relayed through your own server to avoid a browser CORS block.'}` : `No Alpha Vantage, Tradier or Polygon.io key saved yet — add one in <a href="#apikeys">API Keys</a> to enable this. Alpha Vantage is the easiest to get working: it's free, has no US-residency signup requirement, and includes options data on its free tier (Tradier needs a US brokerage/sandbox signup; Polygon's free tier doesn't include options data at all).`} Contract multiplier is set to 100 automatically (standard US equity option sizing). 14 of the 17 structures map onto the live chain (each strike auto-placed at that structure's usual %-OTM distance from spot); Calendar, Diagonal and Double Calendar need a second expiry this panel doesn't fetch yet. Start typing a ticker or company name for suggestions.</div>
       <div id="stkAllStratHost" style="margin-top:14px"></div>
     </div>`;
   document.getElementById('stkFetch').addEventListener('click', fetchStockExpiries);
@@ -1761,11 +1767,16 @@ function wireStockSymbolAutocomplete(){
 async function searchStockSymbols(q){
   const provider = stocksProvider();
   const list = document.getElementById('stkSymbolList');
-  if(!provider || !list || !apiBase) return;
-  const key = getKeys()[provider];
+  if(!provider || !list) return;
+  if(provider!=='alphavantage' && !apiBase) return;
+  const key = stockProviderKey(provider);
   try{
     let results = [];
-    if(provider==='tradier'){
+    if(provider==='alphavantage'){
+      const res = await fetch(`https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords=${encodeURIComponent(q)}&apikey=${key}`);
+      const data = await res.json();
+      results = (data.bestMatches||[]).slice(0,12).map(m=>({symbol:m['1. symbol'], name:m['2. name']}));
+    } else if(provider==='tradier'){
       const data = await apiFetch(`/proxy/tradier/v1/markets/search?q=${encodeURIComponent(q)}&indexes=false&env=${tradierEnvParam()}`, {headers:{'x-provider-key':key}});
       const secs = data.securities && data.securities.security;
       const arr = Array.isArray(secs) ? secs : (secs ? [secs] : []);
@@ -1784,22 +1795,44 @@ async function fetchStockExpiries(){
   if(!symbol){ st.innerHTML = `<span class="ld err"></span>Enter a symbol`; return; }
   lastStockSymbol = symbol;
   const provider = stocksProvider();
-  if(!provider){ st.innerHTML = `<span class="ld err"></span>No Tradier or Polygon.io key saved — add one in API Keys`; return; }
-  const key = getKeys()[provider];
+  if(!provider){ st.innerHTML = `<span class="ld err"></span>No Alpha Vantage, Tradier or Polygon.io key saved — add one in API Keys`; return; }
+  const key = stockProviderKey(provider);
   st.innerHTML = `<span class="ld"></span>Loading…`;
   try{
     let expirations;
+    let avSpot=null, avList=null;
     if(provider==='tradier'){
       const data = await apiFetch(`/proxy/tradier/v1/markets/options/expirations?symbol=${symbol}&includeAllRoots=true&env=${tradierEnvParam()}`, {headers:{'x-provider-key':key}});
       const exp = data.expirations && data.expirations.date;
       expirations = Array.isArray(exp) ? exp : (exp ? [exp] : []);
-    } else {
+    } else if(provider==='polygon'){
       const data = await apiFetch(`/proxy/polygon/v3/reference/options/contracts?underlying_ticker=${symbol}&limit=1000&order=asc&sort=expiration_date`, {headers:{'x-provider-key':key}});
       const dates = (data.results||[]).map(c=>c.expiration_date);
       expirations = [...new Set(dates)].sort();
+    } else {
+      const [quoteRes, chainRes] = await Promise.all([
+        fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${key}`),
+        fetch(`https://www.alphavantage.co/query?function=HISTORICAL_OPTIONS&symbol=${symbol}&apikey=${key}`)
+      ]);
+      const quoteData = await quoteRes.json();
+      const chainData = await chainRes.json();
+      if(chainData.Information || chainData.Note || chainData['Error Message']) throw new Error(chainData.Information || chainData.Note || chainData['Error Message']);
+      const q = quoteData['Global Quote'];
+      avSpot = q && q['05. price'] ? parseFloat(q['05. price']) : null;
+      avList = (chainData.data||[]).map(o=>({
+        strike: parseFloat(o.strike),
+        option_type: o.type==='put' ? 'put' : 'call',
+        bid: o.bid!=null && o.bid!=='' ? parseFloat(o.bid) : null,
+        ask: o.ask!=null && o.ask!=='' ? parseFloat(o.ask) : null,
+        last: o.last!=null && o.last!=='' ? parseFloat(o.last) : null,
+        oi: o.open_interest ? parseInt(o.open_interest) : 0,
+        iv: o.implied_volatility!=null && o.implied_volatility!=='' ? parseFloat(o.implied_volatility)*100 : null,
+        expiration: o.expiration
+      }));
+      expirations = [...new Set(avList.map(o=>o.expiration))].sort();
     }
     if(!expirations.length){ st.innerHTML = `<span class="ld err"></span>No option expirations found for ${symbol}`; return; }
-    stockCache[symbol] = {provider, expirations};
+    stockCache[symbol] = {provider, expirations, avSpot, avList};
     const expSel = document.getElementById('stkExpiry');
     expSel.innerHTML = expirations.map(d=>`<option value="${d}">${d}</option>`).join('');
     document.getElementById('stkExpiryWrap').style.display='flex';
@@ -1829,11 +1862,14 @@ async function loadStockLegs(){
   const cache = stockCache[symbol];
   if(!cache){ st.innerHTML = `<span class="ld err"></span>Load expiries first`; return; }
   const provider = cache.provider;
-  const key = getKeys()[provider];
-  st.innerHTML = `<span class="ld"></span>Fetching chain…`;
+  const key = stockProviderKey(provider);
+  st.innerHTML = `<span class="ld"></span>${provider==='alphavantage'?'Reading cached chain…':'Fetching chain…'}`;
   try{
     let list, strikesArr, premiumFor, spot;
-    if(provider==='tradier'){
+    if(provider==='alphavantage'){
+      spot = cache.avSpot;
+      list = cache.avList.filter(o=>o.expiration===expiry);
+    } else if(provider==='tradier'){
       const [quoteData, chainData] = await Promise.all([
         apiFetch(`/proxy/tradier/v1/markets/quotes?symbols=${symbol}&env=${tradierEnvParam()}`, {headers:{'x-provider-key':key}}),
         apiFetch(`/proxy/tradier/v1/markets/options/chains?symbol=${symbol}&expiration=${expiry}&greeks=true&env=${tradierEnvParam()}`, {headers:{'x-provider-key':key}})
@@ -2572,7 +2608,7 @@ function renderVerdictContent(){
 document.getElementById('vbRefresh').addEventListener('click', refreshSignals);
 
 /* ---------- Version check / update button ---------- */
-const CURRENT_VERSION = "2.9";
+const CURRENT_VERSION = "2.10";
 let updateAvailable = null; // set to remote version string when a newer one is seen
 
 async function doRefreshData(){
