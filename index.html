@@ -90,6 +90,13 @@ nav.links a:hover{color:var(--fg)}
 .lfspark{width:100%;height:28px;display:block;margin-bottom:6px;opacity:.85}
 .blurval{filter:blur(3.5px);user-select:none;color:var(--fg)}
 
+/* content-level gating: hidden until a real signed-in session (body.full-access) */
+body:not(.full-access) .gated{display:none !important}
+body.full-access .gatenote{display:none !important}
+.gatenote{margin-top:10px;padding:10px 12px;border:1px dashed var(--line);border-radius:8px;background:var(--bg);font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:7px}
+.gatenote::before{content:'🔒';font-size:12px;opacity:.75}
+.scard p.gatenote,.scard .gatenote{margin-top:8px;font-size:11.5px;padding:7px 9px}
+
 /* section shell */
 section{padding:56px 0;border-bottom:1px solid var(--line)}
 section .shead{margin-bottom:28px;max-width:640px}
@@ -294,7 +301,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
 </style>
 </head>
 <body class="landing-mode">
-<script>try{ if(localStorage.getItem('nvd_token')){ document.body.classList.remove('landing-mode'); } }catch(e){}</script>
+<script>try{ if(localStorage.getItem('nvd_token')){ document.body.classList.remove('landing-mode'); document.body.classList.add('full-access'); } }catch(e){}</script>
 
 <header class="top">
   <div class="wrap topbar">
@@ -332,7 +339,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
       <a href="#manual">Manual</a>
       <a href="#account">Account</a>
     </nav>
-    <span class="chip verchip" id="verChip">v2.3</span>
+    <span class="chip verchip" id="verChip">v2.4</span>
     <span class="chip" id="welcomeChip" style="display:none"></span>
     <button class="btn sm" id="globalRefresh">⟳ Refresh</button>
     <span class="chip"><span class="dot"></span> Client-side · no stored data</span>
@@ -455,7 +462,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
     </div>
 
     <div class="assettabs" id="assettabs"></div>
-    <div id="livePanelHost"></div>
+    <div id="livePanelHost" class="gated"></div>
 
     <div class="vbsec">
       <div class="vb-head">
@@ -466,11 +473,11 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
       </div>
       <div class="vb-body">
         <div class="vmenu" id="vmenu"></div>
-        <div class="vcontent" id="vcontent"></div>
+        <div class="vcontent gated" id="vcontent"></div>
       </div>
     </div>
 
-    <div class="builder">
+    <div class="builder gated">
       <div class="panel" id="inputsPanel"></div>
       <div class="resultsPanel">
         <div class="kvgrid" id="kvgrid"></div>
@@ -483,6 +490,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
         <div id="ticketHost"></div>
       </div>
     </div>
+    <p class="gatenote">Sign in (see Account below) to load live strikes, compute payoffs, and use the full builder.</p>
   </div>
 </section>
 
@@ -518,7 +526,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
 
     <details class="acsub exgroup">
       <summary><h4>Crypto options (the live data source for this desk)</h4></summary>
-      <table class="extbl">
+      <table class="extbl gated">
         <tr><th>Exchange</th><th>What it lists</th><th>Data used here</th><th>API cost</th><th>Notes</th></tr>
         <tr><td class="exname">Deribit</td><td>BTC, ETH, SOL, XRP options &amp; futures — by far the deepest crypto options order book</td><td><span class="exlive">LIVE</span> spot, mark IV, realized vol, funding, OI, PCR, skew</td><td><span class="excost free">Free, no key</span></td><td>This desk's entire live-signal layer runs on Deribit's public REST API. Everything in the Market Signal Verdicts menu and the Prediction Radar traces back here.</td></tr>
         <tr><td class="exname">OKX</td><td>BTC, ETH options; smaller book than Deribit</td><td><span class="exnolive">Not pulled</span></td><td><span class="excost free">Free tier</span></td><td>Public market-data endpoints exist and are keyless for read-only use; not wired into this build yet.</td></tr>
@@ -530,7 +538,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
 
     <details class="acsub exgroup">
       <summary><h4>Crypto perps / spot (feeds the funding, OI &amp; positioning signals)</h4></summary>
-      <table class="extbl">
+      <table class="extbl gated">
         <tr><th>Exchange</th><th>What it lists</th><th>Data used here</th><th>API cost</th><th>Notes</th></tr>
         <tr><td class="exname">Deribit Perpetuals</td><td>BTC/ETH perpetual futures</td><td><span class="exlive">LIVE</span> funding rate (8h)</td><td><span class="excost free">Free, no key</span></td><td>Same API as the options data above — one keyless source for both.</td></tr>
         <tr><td class="exname">Hyperliquid</td><td>On-chain perpetuals, broad altcoin coverage</td><td><span class="exnolive">Not pulled on this site</span></td><td><span class="excost free">Free, no key</span></td><td>Relevant to your other trading workflow, not wired into this non-directional desk — different product, different purpose.</td></tr>
@@ -542,7 +550,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
 
     <details class="acsub exgroup">
       <summary><h4>Equity &amp; ETF options (stocks panel — stubbed, not faked)</h4></summary>
-      <table class="extbl">
+      <table class="extbl gated">
         <tr><th>Exchange</th><th>What it lists</th><th>Data used here</th><th>API cost</th><th>Notes</th></tr>
         <tr><td class="exname">CBOE</td><td>The largest US equity/index options exchange (SPX, VIX, single stocks)</td><td><span class="exnolive">Not pulled</span></td><td><span class="excost paid">Paid</span></td><td>Real-time CBOE data requires a paid market-data subscription (direct or via a broker/vendor feed).</td></tr>
         <tr><td class="exname">Nasdaq / NYSE Options</td><td>US-listed equity &amp; ETF options</td><td><span class="exnolive">Not pulled</span></td><td><span class="excost paid">Paid</span></td><td>Same situation — real-time options chain data is a licensed product, not a free public API.</td></tr>
@@ -552,7 +560,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
 
     <details class="acsub exgroup">
       <summary><h4>Forex &amp; rates options (no central exchange)</h4></summary>
-      <table class="extbl">
+      <table class="extbl gated">
         <tr><th>Exchange</th><th>What it lists</th><th>Data used here</th><th>API cost</th><th>Notes</th></tr>
         <tr><td class="exname">Interbank OTC (FX options)</td><td>Currency pair options — traded bank-to-bank, no central order book</td><td><span class="exnolive">Not applicable</span></td><td><span class="excost paid">Paid (vendor feeds)</span></td><td>FX options have no single public exchange at all — pricing comes from bank/vendor feeds (Bloomberg, Refinitiv, 360T). This desk uses free ECB spot rates (Frankfurter.app) as context only, not options pricing.</td></tr>
         <tr><td class="exname">CME (FX &amp; rates futures options)</td><td>Exchange-listed FX futures options, Treasury futures options</td><td><span class="exnolive">Not pulled</span></td><td><span class="excost paid">Paid data license</span></td><td>Same licensing situation as CME crypto products above.</td></tr>
@@ -569,7 +577,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
       <p class="sdesc">There are only three real mechanisms behind any "they knew the number before it came out" claim — this panel uses the one that's genuinely free and fetches it live instead of asking you to type numbers in.</p>
     </div>
 
-    <div class="livepanel">
+    <div class="livepanel gated">
       <div class="lp-head"><b>The three real mechanisms</b></div>
       <div class="note">
         <b>1. Survey consensus</b> — outlets like Trading Economics, Econoday, and Bloomberg poll dozens of economists before each release and publish the median guess (e.g. "CPI forecast: 3.1%"). This is a licensed, paid product — there is no free, keyless API that publishes it.<br><br>
@@ -579,7 +587,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
       <div class="note">This panel below runs #3 for you automatically, live, from free data — no manual entry. #1 stays a paid product (flagged honestly, not faked); #2 is partially covered via the 10-Year Treasury yield card as a genuine market-priced reference point.</div>
     </div>
 
-    <div class="livepanel">
+    <div class="livepanel gated">
       <div class="lp-head">
         <b>Live macro data — CPI, unemployment, Fed funds rate, 10Y yield</b>
         <span class="lp-status" id="macroStatus"><span class="ld"></span>Idle</span>
@@ -592,6 +600,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
       <div class="note">Get a free key in seconds at <code>alphavantage.co/support/#api-key</code> — no card, no paid tier required for these endpoints (rate-limited to 25 calls/day on the free tier, which this panel respects by batching one call per indicator per refresh). The key is stored only in your browser's local storage.</div>
       <div id="macroHost"></div>
     </div>
+    <p class="gatenote">Sign in to view the full Macro Fundamentals panel.</p>
   </div>
 </section>
 
@@ -603,7 +612,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
       <p class="sdesc">Two different "calendars," both live: when crypto options actually expire (this desk's own purpose, pulled straight from Deribit), and a ForexFactory/CryptoCraft-style macro event schedule for context.</p>
     </div>
 
-    <div class="livepanel">
+    <div class="livepanel gated">
       <div class="lp-head">
         <b>Options expiry calendar — Deribit, live, free</b>
         <span class="lp-status" id="expiryStatus"><span class="ld"></span>Idle</span>
@@ -616,7 +625,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
       <div id="expiryHost"></div>
     </div>
 
-    <div class="livepanel">
+    <div class="livepanel gated">
       <div class="lp-head">
         <b>Macro event calendar — unofficial ForexFactory feed</b>
         <span class="lp-status" id="macCalStatus"><span class="ld"></span>Idle</span>
@@ -627,6 +636,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
       <div class="note">This is the same free, un-keyed JSON feed (<code>nfs.faireconomy.media</code>) that powers ForexFactory's own embeddable calendar widget — it is not an official, documented API and could change or go away without notice, so treat it as "usually works," not guaranteed. It gives the scheduled date/time, currency, and impact of each release (CPI, NFP, FOMC, etc.) plus the <b>economist consensus forecast and the prior reading</b> — this is the one free source found for that otherwise-paid survey-consensus number flagged in Macro Fundamentals above. It does not give released actual values ahead of time, because nothing does.</div>
       <div id="macCalHost"></div>
     </div>
+    <p class="gatenote">Sign in to view both live expiry calendars.</p>
   </div>
 </section>
 
@@ -637,8 +647,8 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
       <h3 class="stitle">Advanced journal — auto-captured, not typed in</h3>
       <p class="sdesc">Every field below is pulled straight from the Builder and live signal panel at the moment you click "Log this trade" in the Builder above — strikes, premiums, max profit/loss, breakevens, and the signal verdict that was showing at the time. Nothing here is manually entered, so there's no risk of the journal drifting from what you actually built.</p>
     </div>
-    <div id="journalSummary"></div>
-    <div class="livepanel">
+    <div id="journalSummary" class="gated"></div>
+    <div class="livepanel gated">
       <div class="lp-head">
         <b>Logged trades</b>
         <span class="lp-status"></span>
@@ -651,6 +661,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
       <div class="note">Stored only in this browser's local storage (<code>nvd_journal</code>) — nothing is sent anywhere. Clearing your browser data or switching devices means this journal doesn't come with you unless you export it first.</div>
       <div id="journalHost"></div>
     </div>
+    <p class="gatenote">Sign in to view your journal stats and logged trades.</p>
   </div>
 </section>
 
@@ -664,8 +675,9 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
 
     <details class="acsub">
       <summary><h4>1. Terms &amp; abbreviations</h4></summary>
-      <p class="acnote">What every label on this site actually means.</p>
-      <dl class="gloss">
+      <p class="gatenote">Sign in to view the full glossary.</p>
+      <p class="acnote gated">What every label on this site actually means.</p>
+      <dl class="gloss gated">
         <dt>OTM (out-of-the-money)</dt><dd>A call with a strike above current price, or a put with a strike below it. No intrinsic value yet — the premium is pure time/volatility value, which is why OTM options are cheaper and need a bigger move to pay off.</dd>
         <dt>ITM (in-the-money)</dt><dd>A call with a strike below current price, or a put above it. Already has intrinsic value, so it costs more and moves closer to 1:1 with the underlying.</dd>
         <dt>ATM (at-the-money)</dt><dd>Strike approximately equal to current price. Maximum time value, maximum sensitivity to a move in either direction — the typical straddle strike.</dd>
@@ -696,8 +708,9 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
 
     <details class="acsub">
       <summary><h4>2. Exact thresholds the verdict engine uses</h4></summary>
-      <p class="acnote">No hidden math — this is every number <code>verdictFor()</code> actually checks, so you can judge the call yourself instead of taking the pill color on faith.</p>
-      <table class="threshtbl">
+      <p class="gatenote">Sign in to view the full threshold table.</p>
+      <p class="acnote gated">No hidden math — this is every number <code>verdictFor()</code> actually checks, so you can judge the call yourself instead of taking the pill color on faith.</p>
+      <table class="threshtbl gated">
         <tr><th>Signal</th><th>Threshold</th><th>What it flags</th></tr>
         <tr><td>IV − RV spread</td><td class="mono">&lt; −3 pts</td><td>Premium looks cheap → favors buying volatility (straddle, strangle, backspreads, guts, reverse condor)</td></tr>
         <tr><td>IV − RV spread</td><td class="mono">&gt; +6 pts</td><td>Premium looks rich enough that buying it is a weak bet → AVOID on long-vol structures</td></tr>
@@ -712,7 +725,8 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
 
     <details class="acsub">
       <summary><h4>3. How to actually read a signal, in plain terms</h4></summary>
-      <div class="acgrid">
+      <p class="gatenote">Sign in to view the full Q&amp;A.</p>
+      <div class="acgrid gated">
         <div class="acc"><details><summary>IV is above realized vol — what do I do with that?</summary><div class="accbody">Options are pricing in more movement than has actually been happening. That's good for strategies that sell premium (condor, butterfly, calendars, ratio spreads, ladder) and bad for strategies that buy it (straddle, strangle, backspreads, guts) — you'd be overpaying for movement that hasn't shown up yet.</div></details></div>
         <div class="acc"><details><summary>IV is below realized vol — what do I do with that?</summary><div class="accbody">The reverse: options are cheap relative to what's actually been moving. Favors buying premium (straddle, strangle, backspreads, guts, reverse condor) and is a weaker setup for selling it, since you'd be collecting less than the recent movement would justify.</div></details></div>
         <div class="acc"><details><summary>Fear &amp; Greed is at an extreme — what does that change?</summary><div class="accbody">Extremes (fear or greed) have historically preceded sharper reversals or continuation moves than a neutral reading. That raises the odds a big-move (long-vol) structure gets paid, and raises the odds a pinned/range (short-vol) structure gets run over.</div></details></div>
@@ -725,7 +739,8 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
 
     <details class="acsub">
       <summary><h4>4. Process — taking a trade off this desk, step by step</h4></summary>
-      <div class="steplist">
+      <p class="gatenote">Sign in to view the full step-by-step process.</p>
+      <div class="steplist gated">
         <div class="stepit"><span class="sno"></span><div class="stxt"><b>Pick the asset.</b><span>Switch the asset tab (e.g. BTC, ETH) in the Builder. Everything below — live legs, signals, verdicts — refreshes to that asset.</span></div></div>
         <div class="stepit"><span class="sno"></span><div class="stxt"><b>Refresh signals.</b><span>Hit "Refresh signals" in the Market Signal Verdicts panel so you're reading live data, not a stale snapshot from earlier in the session.</span></div></div>
         <div class="stepit"><span class="sno"></span><div class="stxt"><b>Scan the verdict menu.</b><span>Every structure gets a GO / CAUTION / AVOID pill. Don't just read the color — click into the one you're considering and read the reasoning sentence underneath; it names exactly which signal is driving the call.</span></div></div>
@@ -740,14 +755,16 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
 
     <details class="acsub">
       <summary><h4>5. Every structure on the desk, in one place</h4></summary>
-      <p class="acnote">Pulled straight from the Builder's own data — bias badge, legs, and the one-line explainer, so this list can never drift out of sync with what the Builder actually computes.</p>
-      <div id="acStratHost" class="acgrid"></div>
+      <p class="gatenote">Sign in to view full per-structure data.</p>
+      <p class="acnote gated">Pulled straight from the Builder's own data — bias badge, legs, and the one-line explainer, so this list can never drift out of sync with what the Builder actually computes.</p>
+      <div id="acStratHost" class="acgrid gated"></div>
     </details>
 
     <details class="acsub">
       <summary><h4>6. How stock (equity) options actually work — and what changes per structure</h4></summary>
-      <p class="acnote">Crypto options on Deribit are European-style, cash-settled, and trade 24/7 — none of that is true for listed equity options. If you build any of these 17 structures on stocks instead of crypto, these mechanics change the real-world risk even though the payoff math in this builder is identical.</p>
-      <dl class="gloss">
+      <p class="gatenote">Sign in to view the full stock-options breakdown.</p>
+      <p class="acnote gated">Crypto options on Deribit are European-style, cash-settled, and trade 24/7 — none of that is true for listed equity options. If you build any of these 17 structures on stocks instead of crypto, these mechanics change the real-world risk even though the payoff math in this builder is identical.</p>
+      <dl class="gloss gated">
         <dt>Contract size (100 shares)</dt><dd>One listed equity option = 100 shares, not 1. Set the Builder's "Multiplier" field to 100 for stocks (it defaults to crypto's 1-coin sizing) — leaving it wrong makes every dollar figure off by 100x.</dd>
         <dt>American-style exercise &amp; early assignment</dt><dd>Nearly all single-stock options can be exercised any time before expiry, not just at expiry like Deribit's crypto options. Any leg where you're <b>short</b> an option can be assigned early — meaning a multi-leg "non-directional" structure can suddenly become a naked stock position overnight, before you intended to close anything.</dd>
         <dt>Dividend / ex-dividend risk on short calls</dt><dd>A short call deep ITM going into an ex-dividend date is a real early-assignment risk — the holder may exercise to capture the dividend, handing you a short-stock position you didn't plan for. This specifically threatens the short-call leg in straddles, strangles, condors, butterflies, call ratio spreads, ladders, and jade lizards.</dd>
@@ -755,8 +772,8 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
         <dt>Pattern Day Trader (PDT) rule</dt><dd>US accounts under $25,000 equity face a 3-day-trade-in-5-business-days limit before being flagged PDT, which can restrict exactly the kind of active entry/exit this desk's signals encourage. Crypto/Deribit has no such rule.</dd>
         <dt>Settlement (T+1)</dt><dd>US equity trades settle T+1 (one business day) as of 2024; options themselves settle the next business day after exercise/assignment. Crypto settles effectively instantly. This affects how fast capital from a closed leg is actually available again, not the payoff math itself.</dd>
       </dl>
-      <p class="acnote">Per-structure stock-specific note (same 17 structures as the Builder):</p>
-      <div id="acStockNoteHost" class="acgrid"></div>
+      <p class="acnote gated">Per-structure stock-specific note (same 17 structures as the Builder):</p>
+      <div id="acStockNoteHost" class="acgrid gated"></div>
     </details>
   </div>
 </section>
@@ -768,7 +785,8 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
       <h3 class="stitle">The full desk manual</h3>
       <p class="sdesc">View-only. There is no file to download here — this page is the document. Right-click, copy, and printing are disabled inside it, and it renders a faint watermark; treat it as the internal reference, not something to forward as a file.</p>
     </div>
-    <div class="manualdoc" id="manualDoc">
+    <p class="gatenote">Sign in to view the full desk manual.</p>
+    <div class="manualdoc gated" id="manualDoc">
       <div class="mdbar">
         <span>NEUTRAL VECTOR DESK — Internal Manual</span>
         <span class="mdtag">VIEW ONLY · NO DOWNLOAD</span>
@@ -1013,10 +1031,11 @@ function renderCards(){
   const grid = document.getElementById('sgrid');
   grid.innerHTML = STRATEGIES.map(s=>`
     <div class="scard ${s.id===current.id?'on':''}" data-id="${s.id}">
-      <div class="stop"><h4>${s.name}</h4><span class="bias ${s.theta.includes('Negative')?'long':(s.theta.includes('Positive')?'short':'flat')}">${s.theta.includes('Negative')?'Long Vol':(s.theta.includes('Positive')?'Short Vol':'Flat / Arb')}</span></div>
-      <p>${s.desc}</p>
-      <div class="legs">${s.legs.map(l=>`<span>${l}</span>`).join('')}</div>
-      <div class="meta"><span>${s.premium}</span><span>Theta: ${s.theta}</span></div>
+      <div class="stop"><h4>${s.name}</h4><span class="bias gated ${s.theta.includes('Negative')?'long':(s.theta.includes('Positive')?'short':'flat')}">${s.theta.includes('Negative')?'Long Vol':(s.theta.includes('Positive')?'Short Vol':'Flat / Arb')}</span></div>
+      <p class="gated">${s.desc}</p>
+      <div class="legs gated">${s.legs.map(l=>`<span>${l}</span>`).join('')}</div>
+      <div class="meta gated"><span>${s.premium}</span><span>Theta: ${s.theta}</span></div>
+      <p class="gatenote">Sign in to view bias, legs &amp; theta.</p>
     </div>`).join('');
   grid.querySelectorAll('.scard').forEach(el=>{
     el.addEventListener('click',()=>{
@@ -1853,7 +1872,7 @@ function renderVerdictMenu(){
     const starred = isWatched(s.id);
     return `<button class="vmitem ${s.id===activeVstrat?'on':''}" data-v="${s.id}">
       <span class="vmleft"><span class="vstar ${starred?'on':''}" data-star="${s.id}">${starred?'★':'☆'}</span><span>${s.label}</span></span>
-      ${v?`<span class="vpill v-${v.cls}">${v.label}</span>`:''}
+      ${v?`<span class="vpill gated v-${v.cls}">${v.label}</span>`:''}
     </button>`;
   }).join('');
   host.querySelectorAll('.vmitem').forEach(b=>b.addEventListener('click',(e)=>{
@@ -2106,7 +2125,7 @@ function renderVerdictContent(){
 document.getElementById('vbRefresh').addEventListener('click', refreshSignals);
 
 /* ---------- Version check / update button ---------- */
-const CURRENT_VERSION = "2.3";
+const CURRENT_VERSION = "2.4";
 let updateAvailable = null; // set to remote version string when a newer one is seen
 
 async function doRefreshData(){
@@ -2441,10 +2460,12 @@ function renderAuthPanel(){
     welcome.style.display = '';
     welcome.textContent = `Welcome, ${displayNameFor(authUser)}`;
     exitLandingMode();
+    document.body.classList.add('full-access');
   } else {
     st.innerHTML = `<span class="ld"></span>Signed out`;
     keysPanel.style.display = 'none';
     welcome.style.display = 'none';
+    document.body.classList.remove('full-access');
     host.innerHTML = `
       <div class="lp-row" style="flex-wrap:wrap">
         <div class="field" style="flex:1"><label>Email</label><input type="email" id="authEmail"></div>
