@@ -60,6 +60,15 @@ nav.links a:hover{color:var(--fg)}
 .hero .stats{display:flex;gap:28px;margin-top:40px;flex-wrap:wrap}
 .hero .stat small{display:block;color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px}
 .hero .stat b{font-family:var(--mono);font-size:19px;color:var(--silver)}
+.trustrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}
+
+.landing-features{padding:48px 0 56px}
+.lfgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
+.lfcard{display:block;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px;text-decoration:none;color:var(--fg);transition:border-color .15s,transform .15s}
+.lfcard:hover{border-color:var(--accent);transform:translateY(-2px)}
+.lfcard .lficon{font-size:22px;margin-bottom:10px}
+.lfcard h4{margin:0 0 8px;font-size:15px}
+.lfcard p{margin:0;color:var(--muted);font-size:13px;line-height:1.55}
 
 /* section shell */
 section{padding:56px 0;border-bottom:1px solid var(--line)}
@@ -297,7 +306,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
       <a href="#manual">Manual</a>
       <a href="#account">Account</a>
     </nav>
-    <span class="chip verchip" id="verChip">v2.0</span>
+    <span class="chip verchip" id="verChip">v2.1</span>
     <button class="btn sm" id="globalRefresh">⟳ Refresh</button>
     <span class="chip"><span class="dot"></span> Client-side · no stored data</span>
   </div>
@@ -307,15 +316,63 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
   <div class="wrap">
     <div class="eyebrow">Non-directional options desk</div>
     <h2>Structure trades on <em>magnitude and volatility</em> — not on guessing which way price goes.</h2>
-    <p class="lead">Neutral Vector Desk is a reference and payoff-builder for options structures that don't require a directional call: straddles, strangles, iron condors and calendars. Every structure here still carries real risk — this desk shows you where it sits, not a promise that it can't lose.</p>
+    <p class="lead">Neutral Vector Desk is a live payoff-builder, signal scanner, journal and execution desk for options structures that don't require a directional call — straddles, strangles, iron condors, calendars, ratio spreads and more. Every structure here still carries real risk — this desk shows you where it sits, not a promise that it can't lose.</p>
     <div class="cta">
       <a class="btn primary" href="#builder">Open the builder →</a>
       <a class="btn" href="#strategies">Browse strategies</a>
     </div>
+    <div class="trustrow">
+      <span class="chip">Live Deribit option chains</span>
+      <span class="chip">No fund custody — trades route to your own exchange account</span>
+      <span class="chip">Open-source, self-hostable backend</span>
+    </div>
     <div class="stats">
       <div class="stat"><small>Structures covered</small><b id="structCount">17</b></div>
       <div class="stat"><small>Directional bias required</small><b>None</b></div>
-      <div class="stat"><small>Data source</small><b>Your inputs</b></div>
+      <div class="stat"><small>Live crypto assets</small><b>BTC·ETH·SOL·XRP</b></div>
+      <div class="stat"><small>Data source</small><b>Free, keyless APIs</b></div>
+    </div>
+  </div>
+</section>
+
+<section class="landing-features">
+  <div class="wrap">
+    <div class="shead">
+      <div class="kicker">What's on the desk</div>
+      <h3 class="stitle">One page, from idea to logged trade</h3>
+      <p class="sdesc">Everything below is live and linked from here — nothing is a mockup or a "coming soon."</p>
+    </div>
+    <div class="lfgrid">
+      <a class="lfcard" href="#builder">
+        <div class="lficon">📐</div>
+        <h4>Builder</h4>
+        <p>Model any of the 17 structures leg by leg — live or hand-entered strikes/premiums — and see max profit, max loss, breakevens and the payoff curve update instantly.</p>
+      </a>
+      <a class="lfcard" href="#radar">
+        <div class="lficon">📡</div>
+        <h4>Signal verdicts &amp; Prediction Radar</h4>
+        <p>GO / CAUTION / AVOID per structure, built from live IV vs realized vol, funding, Fear &amp; Greed, OI skew and more — plus a desk-wide synthesized read.</p>
+      </a>
+      <a class="lfcard" href="#calendar">
+        <div class="lficon">🗓️</div>
+        <h4>Calendar</h4>
+        <p>Live options-expiry calendar from Deribit, plus a ForexFactory/CryptoCraft-style macro event schedule — CPI, NFP, FOMC and more.</p>
+      </a>
+      <a class="lfcard" href="#journal">
+        <div class="lficon">📓</div>
+        <h4>Advanced Journal</h4>
+        <p>"Log this trade" auto-captures the live structure and signal state — no manual entry. Close trades, track realized P&amp;L and win rate, export CSV/JSON.</p>
+      </a>
+      <a class="lfcard" href="#builder">
+        <div class="lficon">🎫</div>
+        <h4>Trade ticket &amp; real execution</h4>
+        <p>A copyable order ticket by default. Sign in and add exchange keys to send real orders — Hyperliquid, Binance, Bybit, OKX, Deribit, Coinbase — straight from this page.</p>
+      </a>
+      <a class="lfcard" href="#academy">
+        <div class="lficon">🎓</div>
+        <h4>Vocabulary &amp; Academy</h4>
+        <p>Every term, every verdict threshold, a step-by-step process, and how equity options mechanically differ from crypto — contract size, early assignment, dividends.</p>
+      </a>
     </div>
   </div>
 </section>
@@ -1987,7 +2044,7 @@ function renderVerdictContent(){
 document.getElementById('vbRefresh').addEventListener('click', refreshSignals);
 
 /* ---------- Version check / update button ---------- */
-const CURRENT_VERSION = "2.0";
+const CURRENT_VERSION = "2.1";
 let updateAvailable = null; // set to remote version string when a newer one is seen
 
 async function doRefreshData(){
