@@ -340,7 +340,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
       <a href="#apikeys">API Keys</a>
       <a href="#account">Account</a>
     </nav>
-    <span class="chip verchip" id="verChip">v2.8</span>
+    <span class="chip verchip" id="verChip">v2.9</span>
     <span class="chip" id="welcomeChip" style="display:none"></span>
     <button class="btn sm" id="globalRefresh">⟳ Refresh</button>
     <span class="chip"><span class="dot"></span> Client-side · no stored data</span>
@@ -1738,10 +1738,12 @@ function renderStocksPanel(host){
         <div class="field" id="stkExpiryWrap" style="display:none"><label>Expiry</label><select id="stkExpiry"></select></div>
         <button class="btn" id="stkLoadLegs" style="display:none">Load live strikes into builder</button>
       </div>
-      <div class="note">${provider ? `Using your saved <b>${provider==='tradier'?'Tradier':'Polygon.io'}</b> key (manage it in <a href="#apikeys">API Keys</a>).` : `No Tradier or Polygon.io key saved yet — add one in <a href="#apikeys">API Keys</a> to enable this.`} Requires your backend (Account section) to be connected, since the key is relayed through your own server to avoid a browser CORS block. Contract multiplier is set to 100 automatically (standard US equity option sizing). Straddle/strangle/condor/butterfly are supported from a live chain; calendar needs a second expiry this panel doesn't fetch yet, so it loads flat ATM legs as a starting point — adjust manually. Start typing a ticker or company name for suggestions.</div>
+      <div class="note">${provider ? `Using your saved <b>${provider==='tradier'?'Tradier':'Polygon.io'}</b> key (manage it in <a href="#apikeys">API Keys</a>).` : `No Tradier or Polygon.io key saved yet — add one in <a href="#apikeys">API Keys</a> to enable this.`} Requires your backend (Account section) to be connected, since the key is relayed through your own server to avoid a browser CORS block. Contract multiplier is set to 100 automatically (standard US equity option sizing). 14 of the 17 structures map onto the live chain (each strike auto-placed at that structure's usual %-OTM distance from spot); Calendar, Diagonal and Double Calendar need a second expiry this panel doesn't fetch yet. Start typing a ticker or company name for suggestions.</div>
+      <div id="stkAllStratHost" style="margin-top:14px"></div>
     </div>`;
   document.getElementById('stkFetch').addEventListener('click', fetchStockExpiries);
   document.getElementById('stkLoadLegs').addEventListener('click', loadStockLegs);
+  renderStockAllStrategies();
   wireStockSymbolAutocomplete();
 }
 
@@ -1872,33 +1874,108 @@ async function loadStockLegs(){
     if(!spot || !strikesArr.length){ st.innerHTML = `<span class="ld err"></span>No usable chain data returned for that expiry`; return; }
     stockCache[symbol].lastChain = {list, spot, expiry};
 
-    const atm = nearest(strikesArr, spot);
-    const idx = strikesArr.indexOf(atm);
-    let plan;
-    if(current.id==='straddle'){
-      plan = [{key:'legA',type:'call',strike:atm},{key:'legB',type:'put',strike:atm}];
-    } else if(current.id==='strangle'){
-      const upS = strikesArr[Math.min(idx+2,strikesArr.length-1)], dnS = strikesArr[Math.max(idx-2,0)];
-      plan = [{key:'legA',type:'call',strike:upS},{key:'legB',type:'put',strike:dnS}];
-    } else if(current.id==='condor'){
-      const sC=strikesArr[Math.min(idx+2,strikesArr.length-1)], bC=strikesArr[Math.min(idx+4,strikesArr.length-1)];
-      const sP=strikesArr[Math.max(idx-2,0)], bP=strikesArr[Math.max(idx-4,0)];
-      plan = [{key:'legA',type:'call',strike:sC},{key:'legB',type:'call',strike:bC},{key:'legC',type:'put',strike:sP},{key:'legD',type:'put',strike:bP}];
-    } else if(current.id==='butterfly'){
-      const wC=strikesArr[Math.min(idx+3,strikesArr.length-1)], wP=strikesArr[Math.max(idx-3,0)];
-      plan = [{key:'legA',type:'call',strike:atm},{key:'legB',type:'call',strike:wC},{key:'legC',type:'put',strike:atm},{key:'legD',type:'put',strike:wP}];
+    if(STOCK_LIVE_UNSUPPORTED.has(current.id)){
+      const atm = nearest(strikesArr, spot);
+      applyStockLegsToForm([{key:'legA',strike:atm,premiumUsd:premiumFor(atm,'call')||0},{key:'legB',strike:atm,premiumUsd:premiumFor(atm,'call')||0}], spot);
+      st.innerHTML = `<span class="ld ok"></span>${current.name} needs a second expiry this panel doesn't fetch — loaded flat ATM legs as a starting point, adjust manually.`;
     } else {
-      plan = [{key:'legA',type:'call',strike:atm},{key:'legB',type:'call',strike:atm}];
+      const legs = liveLegsForStrategy(current, strikesArr, spot, premiumFor);
+      if(!legs){ st.innerHTML = `<span class="ld err"></span>Could not match live premiums for this expiry`; return; }
+      const legKeys = ['legA','legB','legC','legD'];
+      applyStockLegsToForm(legs.map((l,i)=>({key:legKeys[i], strike:l.strike, premiumUsd:l.premium})), spot);
+      st.innerHTML = `<span class="ld ok"></span>Loaded live ${symbol} ${current.name} @ ${expiry} — spot ${spot.toFixed(2)}`;
     }
-
-    const withPrem = plan.map(p=>({key:p.key, strike:p.strike, premiumUsd: premiumFor(p.strike,p.type)})).filter(p=>p.premiumUsd!=null);
-    if(!withPrem.length){ st.innerHTML = `<span class="ld err"></span>Could not match live premiums for this expiry`; return; }
-    applyStockLegsToForm(withPrem, spot);
-    st.innerHTML = `<span class="ld ok"></span>Loaded live ${symbol} ${current.name} @ ${expiry} — spot ${spot.toFixed(2)}`;
     updateVerdictHead();
+    renderStockAllStrategies();
   }catch(e){
     st.innerHTML = `<span class="ld err"></span>${e.message}`;
   }
+}
+
+const STOCK_LIVE_UNSUPPORTED = new Set(['calendar','diagonal','doublecalendar']);
+
+function liveLegsForStrategy(strat, strikesArr, spot, premiumFor){
+  const d = strat.defaults;
+  const legs = [];
+  for(const k of ['legA','legB','legC','legD']){
+    const leg = d[k];
+    if(!leg) continue;
+    const targetStrike = spot * (leg.strike / d.spot);
+    const liveStrike = nearest(strikesArr, targetStrike);
+    const premium = premiumFor(liveStrike, leg.type);
+    if(premium==null) return null;
+    legs.push({type:leg.type, side:leg.side, strike:liveStrike, premium, ratio:leg.ratio||1});
+  }
+  return legs;
+}
+
+function computeLiveStrategyMetrics(strat, chain){
+  if(STOCK_LIVE_UNSUPPORTED.has(strat.id)) return {unsupported:true, reason:'Needs a second expiry — this panel only fetches one at a time.'};
+  const strikesArr = [...new Set(chain.list.map(o=>o.strike))].sort((a,b)=>a-b);
+  const premiumFor = (strike,type)=>{
+    const o = chain.list.find(x=>x.strike===strike && x.option_type===type);
+    if(!o) return null;
+    if(o.bid>0 && o.ask>0) return (o.bid+o.ask)/2;
+    return o.last!=null ? o.last : null;
+  };
+  const legs = liveLegsForStrategy(strat, strikesArr, chain.spot, premiumFor);
+  if(!legs) return {unsupported:true, reason:'Could not match live premiums for this expiry.'};
+  const mult = 100, qty = 1;
+  const lo = chain.spot*0.6, hi = chain.spot*1.4, steps = 300;
+  let maxP=-Infinity, minP=Infinity;
+  for(let i=0;i<=steps;i++){
+    const price = lo + (hi-lo)*i/steps;
+    const p = totalPnl(legs, price, qty, mult);
+    if(p>maxP) maxP=p; if(p<minP) minP=p;
+  }
+  const breakevens = findBreakevens(legs, qty, mult, lo, hi, steps);
+  const netPrem = legs.reduce((s,l)=>s+(l.side==='buy'?l.premium*(l.ratio||1):-l.premium*(l.ratio||1)),0);
+  return {legs, maxP, minP, breakevens, netPrem, spot:chain.spot, mult};
+}
+
+function renderStockAllStrategies(){
+  const host = document.getElementById('stkAllStratHost');
+  if(!host) return;
+  const symbol = lastStockSymbol;
+  const cache = symbol ? stockCache[symbol] : null;
+  if(!cache || !cache.lastChain){
+    host.innerHTML = `<div class="note">Load live strikes in the Builder above first — every structure below reuses that same chain, no extra calls.</div>`;
+    return;
+  }
+  const chain = cache.lastChain;
+  const rows = STRATEGIES.map(s=>({s, m:computeLiveStrategyMetrics(s, chain)}));
+  host.innerHTML = `
+    <div class="note">Live numbers for all 17 structures from this same ${symbol} chain (expiry ${chain.expiry}, spot ${chain.spot.toFixed(2)}) — each structure's strikes are auto-placed at its usual %-OTM distance from spot, mapped onto the real strikes available. No extra network calls.</div>
+    <table class="vtab">
+      <tr><th>Structure</th><th>Max profit</th><th>Max loss</th><th>Breakeven(s)</th><th>Net debit/credit</th><th></th></tr>
+      ${rows.map(({s,m})=>`
+        <tr>
+          <td>${s.name}</td>
+          ${m.unsupported ? `<td colspan="4" style="color:var(--muted)">${m.reason}</td>` : `
+            <td>${m.maxP>=9e8?'Uncapped':'$'+m.maxP.toFixed(0)}</td>
+            <td>$${m.minP.toFixed(0)}</td>
+            <td>${m.breakevens.length?m.breakevens.map(b=>b.toFixed(2)).join(' / '):'—'}</td>
+            <td>${m.netPrem>=0?'Debit':'Credit'} $${Math.abs(m.netPrem*m.mult).toFixed(0)}</td>
+          `}
+          <td>${m.unsupported?'':`<button class="btn sm" data-use="${s.id}">Use this</button>`}</td>
+        </tr>`).join('')}
+    </table>
+  `;
+  host.querySelectorAll('[data-use]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const strat = STRATEGIES.find(x=>x.id===btn.dataset.use);
+      const m = computeLiveStrategyMetrics(strat, chain);
+      if(!strat || m.unsupported) return;
+      current = strat;
+      renderCards(); renderInputs();
+      const legKeys = ['legA','legB','legC','legD'];
+      applyStockLegsToForm(m.legs.map((l,i)=>({key:legKeys[i], strike:l.strike, premiumUsd:l.premium})), chain.spot);
+      const stkSt = document.getElementById('stkStatus');
+      if(stkSt) stkSt.innerHTML = `<span class="ld ok"></span>Loaded live ${symbol} ${strat.name} @ ${chain.expiry} — spot ${chain.spot.toFixed(2)}`;
+      updateVerdictHead();
+      document.getElementById('builder').scrollIntoView({behavior:'smooth', block:'start'});
+    });
+  });
 }
 
 async function fetchStockRealizedVol(symbol, provider, key){
@@ -2495,7 +2572,7 @@ function renderVerdictContent(){
 document.getElementById('vbRefresh').addEventListener('click', refreshSignals);
 
 /* ---------- Version check / update button ---------- */
-const CURRENT_VERSION = "2.8";
+const CURRENT_VERSION = "2.9";
 let updateAvailable = null; // set to remote version string when a newer one is seen
 
 async function doRefreshData(){
