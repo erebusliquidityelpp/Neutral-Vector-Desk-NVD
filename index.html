@@ -21,7 +21,12 @@
 }
 *{box-sizing:border-box}
 html,body{margin:0}
-body{background:var(--bg);color:var(--fg);font:14px/1.5 var(--sans);
+body{background:
+    radial-gradient(1100px 520px at 12% -8%, rgba(109,40,217,.16), transparent 60%),
+    radial-gradient(900px 460px at 92% 4%, rgba(226,153,95,.10), transparent 55%),
+    var(--bg);
+  background-attachment:fixed;
+  color:var(--fg);font:14px/1.5 var(--sans);
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
 }
 h1,h2,h3,p{margin:0}
@@ -31,7 +36,7 @@ a{color:var(--accent)}
 .wrap{max-width:1400px;margin:0 auto;padding:0 8px}
 
 /* header */
-header.top{position:sticky;top:0;z-index:20;background:rgba(11,15,20,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+header.top{position:sticky;top:0;z-index:20;background:rgba(11,15,20,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);box-shadow:0 1px 0 rgba(226,153,95,.08)}
 .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 0}
 .brand{display:flex;align-items:center;gap:10px}
 .brand .mark{width:34px;height:34px;border-radius:9px;background:var(--surface2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;flex:none}
@@ -54,7 +59,10 @@ nav.links a:hover{color:var(--fg)}
 .hero .cta{display:flex;gap:10px;margin-top:26px;flex-wrap:wrap}
 .btn{border:1px solid var(--line);background:var(--surface);padding:10px 18px;border-radius:7px;cursor:pointer;font-size:13.5px;text-decoration:none;color:var(--fg);display:inline-flex;align-items:center;gap:8px}
 .btn:hover{border-color:var(--accent)}
-.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg);font-weight:600}
+.btn{transition:transform .12s,box-shadow .12s,border-color .12s}
+.btn.primary{background:linear-gradient(135deg,var(--accent),#8b4fe8);border-color:var(--accent);color:var(--accent-fg);font-weight:600;box-shadow:0 4px 18px rgba(109,40,217,.35)}
+.btn.primary:hover{transform:translateY(-1px);box-shadow:0 6px 22px rgba(109,40,217,.5)}
+.btn:not(.primary):hover{transform:translateY(-1px)}
 .btn.update{background:var(--accent2);border-color:var(--accent2);color:#2a1608;font-weight:600}
 .btn.updated{background:var(--up);border-color:var(--up);color:#06241a;font-weight:600}
 .hero .stats{display:flex;gap:28px;margin-top:40px;flex-wrap:wrap}
@@ -64,24 +72,28 @@ nav.links a:hover{color:var(--fg)}
 
 .landing-features{padding:48px 0 56px}
 .lfgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
-.lfcard{display:block;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px;text-decoration:none;color:var(--fg);transition:border-color .15s,transform .15s}
-.lfcard:hover{border-color:var(--accent);transform:translateY(-2px)}
+.lfcard{display:block;position:relative;background:linear-gradient(180deg,var(--surface),var(--surface2));border:1px solid var(--line);border-radius:12px;padding:20px;text-decoration:none;color:var(--fg);transition:border-color .15s,transform .15s,box-shadow .15s}
+.lfcard:hover{border-color:var(--accent);transform:translateY(-3px);box-shadow:0 12px 28px rgba(0,0,0,.45),0 0 0 1px rgba(109,40,217,.25)}
 .lfcard .lficon{font-size:22px;margin-bottom:10px}
 .lfcard h4{margin:0 0 8px;font-size:15px}
 .lfcard p{margin:0;color:var(--muted);font-size:13px;line-height:1.55}
+.lfcard.locked{cursor:default}
+.lfcard .lflock{position:absolute;top:16px;right:16px;font-size:13px;opacity:.55}
+.lfcta{display:flex;justify-content:center;margin-top:28px}
 
 /* section shell */
 section{padding:56px 0;border-bottom:1px solid var(--line)}
 section .shead{margin-bottom:28px;max-width:640px}
-section .kicker{font:600 11px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
+section .kicker{font:600 11px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:8px;position:relative;padding-left:16px}
+section .kicker::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:9px;height:1.5px;background:linear-gradient(90deg,var(--accent2),var(--accent))}
 section h3.stitle{font-size:24px;font-weight:700;letter-spacing:-.005em}
 section p.sdesc{color:var(--muted);margin-top:10px;font-size:14px;line-height:1.6}
 
 /* strategy grid */
 .sgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
-.scard{border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:18px;display:flex;flex-direction:column;gap:10px;cursor:pointer;transition:border-color .15s}
-.scard:hover{border-color:var(--accent)}
-.scard.on{border-color:var(--accent);background:var(--surface2)}
+.scard{border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:18px;display:flex;flex-direction:column;gap:10px;cursor:pointer;transition:border-color .15s,box-shadow .15s,transform .15s}
+.scard:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 10px 24px rgba(0,0,0,.4)}
+.scard.on{border-color:var(--accent);background:var(--surface2);box-shadow:0 0 0 1px var(--accent),0 10px 24px rgba(109,40,217,.25)}
 .scard .stop{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
 .scard h4{font-size:15.5px;font-weight:600}
 .scard .bias{font:600 10px var(--mono);letter-spacing:.05em;text-transform:uppercase;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
@@ -101,7 +113,7 @@ section p.sdesc{color:var(--muted);margin-top:10px;font-size:14px;line-height:1.
 .atab.on{background:var(--surface2);border-color:var(--accent);color:var(--fg)}
 .atab .ld{width:6px;height:6px;border-radius:50%;background:var(--muted)}
 .atab .ld.live{background:var(--up)} .atab .ld.stub{background:var(--warn)}
-.livepanel{border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:16px;margin-bottom:16px;display:flex;flex-direction:column;gap:12px}
+.livepanel{border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:16px;margin-bottom:16px;display:flex;flex-direction:column;gap:12px;box-shadow:0 8px 20px rgba(0,0,0,.25)}
 .livepanel .lp-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
 .livepanel .lp-status{font-size:11.5px;color:var(--muted);display:flex;align-items:center;gap:6px}
 .livepanel .lp-status .ld{width:7px;height:7px;border-radius:50%;background:var(--muted)}
@@ -148,6 +160,10 @@ table.vtab td:last-child{text-align:right;font-weight:600}
 .field label{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
 .field input,.field select{background:var(--surface2);border:1px solid var(--line);border-radius:7px;padding:8px 10px;font-family:var(--mono);font-size:13px}
 .field input:focus,.field select:focus{border-color:var(--accent)}
+.pwdwrap{position:relative;display:flex}
+.pwdwrap input{flex:1;padding-right:56px}
+.pwdtoggle{position:absolute;right:4px;top:4px;bottom:4px;border:none;background:var(--surface);color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;padding:0 10px;border-radius:5px;cursor:pointer}
+.pwdtoggle:hover{color:var(--fg);background:var(--line)}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .legrow{border:1px solid var(--line);border-radius:8px;padding:10px;background:var(--bg);display:flex;flex-direction:column;gap:8px}
 .legrow .lh{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
@@ -306,7 +322,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
       <a href="#manual">Manual</a>
       <a href="#account">Account</a>
     </nav>
-    <span class="chip verchip" id="verChip">v2.1</span>
+    <span class="chip verchip" id="verChip">v2.2</span>
     <button class="btn sm" id="globalRefresh">⟳ Refresh</button>
     <span class="chip"><span class="dot"></span> Client-side · no stored data</span>
   </div>
@@ -339,40 +355,49 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
   <div class="wrap">
     <div class="shead">
       <div class="kicker">What's on the desk</div>
-      <h3 class="stitle">One page, from idea to logged trade</h3>
-      <p class="sdesc">Everything below is live and linked from here — nothing is a mockup or a "coming soon."</p>
+      <h3 class="stitle">A glimpse, not the full desk</h3>
+      <p class="sdesc">What each part does — not the live data itself. Real numbers, real verdicts, real P&amp;L start once you're inside.</p>
     </div>
     <div class="lfgrid">
-      <a class="lfcard" href="#builder">
+      <div class="lfcard locked">
+        <span class="lflock">🔒</span>
         <div class="lficon">📐</div>
         <h4>Builder</h4>
-        <p>Model any of the 17 structures leg by leg — live or hand-entered strikes/premiums — and see max profit, max loss, breakevens and the payoff curve update instantly.</p>
-      </a>
-      <a class="lfcard" href="#radar">
+        <p>Model any of the 17 structures leg by leg and see max profit, max loss, breakevens and the payoff curve update instantly.</p>
+      </div>
+      <div class="lfcard locked">
+        <span class="lflock">🔒</span>
         <div class="lficon">📡</div>
         <h4>Signal verdicts &amp; Prediction Radar</h4>
-        <p>GO / CAUTION / AVOID per structure, built from live IV vs realized vol, funding, Fear &amp; Greed, OI skew and more — plus a desk-wide synthesized read.</p>
-      </a>
-      <a class="lfcard" href="#calendar">
+        <p>GO / CAUTION / AVOID per structure, built from live IV vs realized vol, funding, Fear &amp; Greed, OI skew and more.</p>
+      </div>
+      <div class="lfcard locked">
+        <span class="lflock">🔒</span>
         <div class="lficon">🗓️</div>
         <h4>Calendar</h4>
-        <p>Live options-expiry calendar from Deribit, plus a ForexFactory/CryptoCraft-style macro event schedule — CPI, NFP, FOMC and more.</p>
-      </a>
-      <a class="lfcard" href="#journal">
+        <p>Live options-expiry calendar, plus a ForexFactory/CryptoCraft-style macro event schedule — CPI, NFP, FOMC and more.</p>
+      </div>
+      <div class="lfcard locked">
+        <span class="lflock">🔒</span>
         <div class="lficon">📓</div>
         <h4>Advanced Journal</h4>
-        <p>"Log this trade" auto-captures the live structure and signal state — no manual entry. Close trades, track realized P&amp;L and win rate, export CSV/JSON.</p>
-      </a>
-      <a class="lfcard" href="#builder">
+        <p>Auto-captures the live structure and signal state when you log a trade — no manual entry. Realized P&amp;L, win rate, CSV/JSON export.</p>
+      </div>
+      <div class="lfcard locked">
+        <span class="lflock">🔒</span>
         <div class="lficon">🎫</div>
         <h4>Trade ticket &amp; real execution</h4>
-        <p>A copyable order ticket by default. Sign in and add exchange keys to send real orders — Hyperliquid, Binance, Bybit, OKX, Deribit, Coinbase — straight from this page.</p>
-      </a>
-      <a class="lfcard" href="#academy">
+        <p>A copyable order ticket by default. Sign in and add exchange keys to send real orders across six major exchanges.</p>
+      </div>
+      <div class="lfcard locked">
+        <span class="lflock">🔒</span>
         <div class="lficon">🎓</div>
         <h4>Vocabulary &amp; Academy</h4>
-        <p>Every term, every verdict threshold, a step-by-step process, and how equity options mechanically differ from crypto — contract size, early assignment, dividends.</p>
-      </a>
+        <p>Every term, every verdict threshold, a step-by-step process, and how equity options differ from crypto.</p>
+      </div>
+    </div>
+    <div class="lfcta">
+      <a class="btn primary" href="#strategies">Enter the desk →</a>
     </div>
   </div>
 </section>
@@ -818,8 +843,12 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
       </div>
       <div class="lp-row" style="flex-wrap:wrap">
         <div class="field" style="flex:1"><label id="keyApiKeyLabel">API key / wallet address</label><input type="text" id="keyApiKey"></div>
-        <div class="field" style="flex:1"><label id="keyApiSecretLabel">API secret / private key</label><input type="password" id="keyApiSecret"></div>
-        <div class="field" style="flex:1"><label>Passphrase (OKX/Coinbase only)</label><input type="password" id="keyPassphrase"></div>
+        <div class="field" style="flex:1"><label id="keyApiSecretLabel">API secret / private key</label>
+          <div class="pwdwrap"><input type="password" id="keyApiSecret"><button type="button" class="pwdtoggle" data-for="keyApiSecret">Show</button></div>
+        </div>
+        <div class="field" style="flex:1"><label>Passphrase (OKX/Coinbase only)</label>
+          <div class="pwdwrap"><input type="password" id="keyPassphrase"><button type="button" class="pwdtoggle" data-for="keyPassphrase">Show</button></div>
+        </div>
       </div>
       <div class="lp-row"><button class="btn primary" id="keySave">Save credentials</button></div>
     </div>
@@ -2044,7 +2073,7 @@ function renderVerdictContent(){
 document.getElementById('vbRefresh').addEventListener('click', refreshSignals);
 
 /* ---------- Version check / update button ---------- */
-const CURRENT_VERSION = "2.1";
+const CURRENT_VERSION = "2.2";
 let updateAvailable = null; // set to remote version string when a newer one is seen
 
 async function doRefreshData(){
@@ -2358,7 +2387,9 @@ function renderAuthPanel(){
     host.innerHTML = `
       <div class="lp-row" style="flex-wrap:wrap">
         <div class="field" style="flex:1"><label>Email</label><input type="email" id="authEmail"></div>
-        <div class="field" style="flex:1"><label>Password</label><input type="password" id="authPassword" placeholder="min 10 characters"></div>
+        <div class="field" style="flex:1"><label>Password</label>
+          <div class="pwdwrap"><input type="password" id="authPassword" placeholder="min 10 characters"><button type="button" class="pwdtoggle" data-for="authPassword">Show</button></div>
+        </div>
       </div>
       <div class="lp-row">
         <button class="btn primary" id="authLoginBtn">Sign in</button>
@@ -2414,6 +2445,16 @@ function renderKeys(){
     catch(e){ alert(e.message); }
   });
 }
+
+document.addEventListener('click', (e)=>{
+  const btn = e.target.closest('.pwdtoggle');
+  if(!btn) return;
+  const input = document.getElementById(btn.dataset.for);
+  if(!input) return;
+  const hidden = input.type === 'password';
+  input.type = hidden ? 'text' : 'password';
+  btn.textContent = hidden ? 'Hide' : 'Show';
+});
 
 function initAccountPanel(){
   document.getElementById('apiBaseInput').value = apiBase;
