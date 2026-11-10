@@ -275,7 +275,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
       <a href="#academy">Vocabulary &amp; Academy</a>
       <a href="#manual">Manual</a>
     </nav>
-    <span class="chip verchip" id="verChip">v1.7</span>
+    <span class="chip verchip" id="verChip">v1.8</span>
     <button class="btn sm" id="globalRefresh">⟳ Refresh</button>
     <span class="chip"><span class="dot"></span> Client-side · no stored data</span>
   </div>
@@ -323,7 +323,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
     <div class="vbsec">
       <div class="vb-head">
         <b>Market Signal Verdicts</b>
-        <select id="vbCcy"><option value="BTC">BTC</option><option value="ETH">ETH</option></select>
+        <select id="vbCcy"><option value="BTC">BTC</option><option value="ETH">ETH</option><option value="SOL">SOL</option><option value="XRP">XRP</option></select>
         <button class="btn primary" id="vbRefresh">Refresh signals</button>
         <span class="lp-status" id="vbStatus"><span class="ld"></span>Not loaded</span>
       </div>
@@ -374,47 +374,48 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
       <p class="sdesc">Every venue relevant to the strategies on this desk, grouped by asset class — what each one lists, whether this site pulls live data from it, and whether that data is free or paid.</p>
     </div>
 
-    <div class="exgroup">
-      <h4>Crypto options (the live data source for this desk)</h4>
+    <details class="acsub exgroup">
+      <summary><h4>Crypto options (the live data source for this desk)</h4></summary>
       <table class="extbl">
         <tr><th>Exchange</th><th>What it lists</th><th>Data used here</th><th>API cost</th><th>Notes</th></tr>
         <tr><td class="exname">Deribit</td><td>BTC, ETH, SOL, XRP options &amp; futures — by far the deepest crypto options order book</td><td><span class="exlive">LIVE</span> spot, mark IV, realized vol, funding, OI, PCR, skew</td><td><span class="excost free">Free, no key</span></td><td>This desk's entire live-signal layer runs on Deribit's public REST API. Everything in the Market Signal Verdicts menu and the Prediction Radar traces back here.</td></tr>
         <tr><td class="exname">OKX</td><td>BTC, ETH options; smaller book than Deribit</td><td><span class="exnolive">Not pulled</span></td><td><span class="excost free">Free tier</span></td><td>Public market-data endpoints exist and are keyless for read-only use; not wired into this build yet.</td></tr>
-        <tr><td class="exname">Binance Options</td><td>BTC, ETH options (European-style)</td><td><span class="exnolive">Not pulled</span></td><td><span class="excost free">Free tier</span></td><td>Thinner liquidity than Deribit for options specifically; Binance's real strength is spot/perps, not options depth.</td></tr>
+        <tr><td class="exname">Binance Options</td><td>BTC, ETH, BNB, XRP options (European-style) — yes, Binance does list both calls and puts across those</td><td><span class="exnolive">Not pulled — blocked by CORS</span></td><td><span class="excost free">Free tier</span></td><td>Binance's REST API (including the options/eapi endpoints) doesn't send an Access-Control-Allow-Origin header, so a browser blocks the call outright — this is the same wall FRED and BLS hit, not a cost issue. It would need a small server-side proxy to work from a static site like this one; genuinely free, just not browser-callable directly.</td></tr>
         <tr><td class="exname">Bybit Options</td><td>BTC, ETH options</td><td><span class="exnolive">Not pulled</span></td><td><span class="excost free">Free tier</span></td><td>Similar story to Binance — usable API, but thinner options book than Deribit.</td></tr>
         <tr><td class="exname">CME Group</td><td>Cash-settled BTC &amp; ETH options/futures — the institutional/regulated venue</td><td><span class="exnolive">Not pulled</span></td><td><span class="excost paid">Paid data license</span></td><td>No free public API for real-time data; CME market data is sold through licensed vendors (e.g. Bloomberg, Refinitiv, CME DataMine).</td></tr>
       </table>
-    </div>
+    </details>
 
-    <div class="exgroup">
-      <h4>Crypto perps / spot (feeds the funding, OI &amp; positioning signals)</h4>
+    <details class="acsub exgroup">
+      <summary><h4>Crypto perps / spot (feeds the funding, OI &amp; positioning signals)</h4></summary>
       <table class="extbl">
         <tr><th>Exchange</th><th>What it lists</th><th>Data used here</th><th>API cost</th><th>Notes</th></tr>
         <tr><td class="exname">Deribit Perpetuals</td><td>BTC/ETH perpetual futures</td><td><span class="exlive">LIVE</span> funding rate (8h)</td><td><span class="excost free">Free, no key</span></td><td>Same API as the options data above — one keyless source for both.</td></tr>
         <tr><td class="exname">Hyperliquid</td><td>On-chain perpetuals, broad altcoin coverage</td><td><span class="exnolive">Not pulled on this site</span></td><td><span class="excost free">Free, no key</span></td><td>Relevant to your other trading workflow, not wired into this non-directional desk — different product, different purpose.</td></tr>
-        <tr><td class="exname">Binance / Bybit / OKX (perps)</td><td>BTC, ETH, and most liquid altcoin perpetuals</td><td><span class="exnolive">Not pulled</span></td><td><span class="excost free">Free tier</span></td><td>Each has a free, keyless public funding/OI endpoint; not integrated here to avoid duplicating what Deribit already covers for this desk's purpose.</td></tr>
+        <tr><td class="exname">Binance (perps)</td><td>BTC, ETH, and most liquid altcoin perpetuals</td><td><span class="exnolive">Not pulled — blocked by CORS</span></td><td><span class="excost free">Free tier</span></td><td>Binance's REST API doesn't set Access-Control-Allow-Origin — confirmed by Binance's own developer forum, not just inferred. Same wall as their options API above.</td></tr>
+        <tr><td class="exname">Bybit / OKX (perps)</td><td>BTC, ETH, and most liquid altcoin perpetuals</td><td><span class="exnolive">Not pulled</span></td><td><span class="excost free">Free tier</span></td><td>Each has a free public funding/OI endpoint; browser-CORS support unverified for either, and nothing here depends on them since Deribit already covers this desk's funding/OI signal.</td></tr>
         <tr><td class="exname">Coinbase International / Coinbase Advanced</td><td>Spot + regulated derivatives (US-accessible)</td><td><span class="exnolive">Not pulled</span></td><td><span class="excost free">Free tier</span></td><td>Mainly relevant for US-compliant spot/futures access, not options depth.</td></tr>
       </table>
-    </div>
+    </details>
 
-    <div class="exgroup">
-      <h4>Equity &amp; ETF options (stocks panel — stubbed, not faked)</h4>
+    <details class="acsub exgroup">
+      <summary><h4>Equity &amp; ETF options (stocks panel — stubbed, not faked)</h4></summary>
       <table class="extbl">
         <tr><th>Exchange</th><th>What it lists</th><th>Data used here</th><th>API cost</th><th>Notes</th></tr>
         <tr><td class="exname">CBOE</td><td>The largest US equity/index options exchange (SPX, VIX, single stocks)</td><td><span class="exnolive">Not pulled</span></td><td><span class="excost paid">Paid</span></td><td>Real-time CBOE data requires a paid market-data subscription (direct or via a broker/vendor feed).</td></tr>
         <tr><td class="exname">Nasdaq / NYSE Options</td><td>US-listed equity &amp; ETF options</td><td><span class="exnolive">Not pulled</span></td><td><span class="excost paid">Paid</span></td><td>Same situation — real-time options chain data is a licensed product, not a free public API.</td></tr>
         <tr><td class="exname">Broker APIs (IBKR, Tradier, Tastytrade, etc.)</td><td>Routed access to the above exchanges plus usable options-chain data</td><td><span class="exnolive">Not pulled — key slot provided</span></td><td><span class="excost paid">Paid / brokerage account required</span></td><td>This is the realistic free-to-you path if you already have a funded account — the stocks panel on this site has a local key slot ready for one.</td></tr>
       </table>
-    </div>
+    </details>
 
-    <div class="exgroup">
-      <h4>Forex &amp; rates options (no central exchange)</h4>
+    <details class="acsub exgroup">
+      <summary><h4>Forex &amp; rates options (no central exchange)</h4></summary>
       <table class="extbl">
         <tr><th>Exchange</th><th>What it lists</th><th>Data used here</th><th>API cost</th><th>Notes</th></tr>
         <tr><td class="exname">Interbank OTC (FX options)</td><td>Currency pair options — traded bank-to-bank, no central order book</td><td><span class="exnolive">Not applicable</span></td><td><span class="excost paid">Paid (vendor feeds)</span></td><td>FX options have no single public exchange at all — pricing comes from bank/vendor feeds (Bloomberg, Refinitiv, 360T). This desk uses free ECB spot rates (Frankfurter.app) as context only, not options pricing.</td></tr>
         <tr><td class="exname">CME (FX &amp; rates futures options)</td><td>Exchange-listed FX futures options, Treasury futures options</td><td><span class="exnolive">Not pulled</span></td><td><span class="excost paid">Paid data license</span></td><td>Same licensing situation as CME crypto products above.</td></tr>
       </table>
-    </div>
+    </details>
   </div>
 </section>
 
@@ -1112,12 +1113,12 @@ function renderCryptoPanel(host){
         <span class="lp-status" id="drbStatus"><span class="ld"></span>Idle</span>
       </div>
       <div class="lp-row">
-        <div class="field"><label>Currency</label><select id="drbCcy"><option value="BTC">BTC</option><option value="ETH">ETH</option></select></div>
+        <div class="field"><label>Currency</label><select id="drbCcy"><option value="BTC">BTC</option><option value="ETH">ETH</option><option value="SOL">SOL</option><option value="XRP">XRP</option></select></div>
         <button class="btn primary" id="drbFetch">Load expiries</button>
         <div class="field" id="drbExpiryWrap" style="display:none"><label>Expiry</label><select id="drbExpiry"></select></div>
         <button class="btn" id="drbLoadLegs" style="display:none">Load live strikes into builder</button>
       </div>
-      <div class="note" id="drbNote">Pulls real strikes, mark prices and spot from Deribit's public market-data API — the same data their own options UI runs on. No account or key needed. Premiums come back in BTC/ETH terms and are converted to USD using the live index price; contract multiplier is set to 1 (Deribit sizes contracts in units of the underlying, not 100-share lots).</div>
+      <div class="note" id="drbNote">Pulls real strikes, mark prices and spot from Deribit's public market-data API — the same data their own options UI runs on. No account or key needed. BTC and ETH have the deepest books; SOL and XRP options are newer and thinner, so expect wider spreads and occasionally a missing IV/realized-vol reading in the Market Signal Verdicts panel — any signal Deribit doesn't publish for that asset shows as "—" rather than a guess. Premiums come back in the underlying's own terms and are converted to USD using the live index price; contract multiplier is set to 1 (Deribit sizes contracts in units of the underlying, not 100-share lots).</div>
     </div>`;
   document.getElementById('drbFetch').addEventListener('click', fetchDeribitExpiries);
   document.getElementById('drbLoadLegs').addEventListener('click', loadDeribitLegs);
@@ -1257,29 +1258,38 @@ const VSTRATS = [
 let activeVstrat = 'straddle';
 
 async function fetchAtmIv(ccy){
-  const instRes = await fetch(`https://www.deribit.com/api/v2/public/get_instruments?currency=${ccy}&kind=option&expired=false`);
-  const instData = await instRes.json();
-  const instruments = instData.result;
-  const expiries = [...new Set(instruments.map(i=>i.expiration_timestamp))].sort((a,b)=>a-b);
-  const nearExp = expiries[0];
-  const calls = instruments.filter(i=>i.expiration_timestamp===nearExp && i.option_type==='call');
-  const probe = await fetchTicker(calls[0].instrument_name);
-  const spot = probe.underlying_price;
-  const strikes = calls.map(i=>i.strike);
-  const atmStrike = nearest(strikes, spot);
-  const atmName = calls.find(i=>i.strike===atmStrike).instrument_name;
-  const atmTicker = await fetchTicker(atmName);
-  return {iv: atmTicker.mark_iv, spot};
+  try{
+    const instRes = await fetch(`https://www.deribit.com/api/v2/public/get_instruments?currency=${ccy}&kind=option&expired=false`);
+    const instData = await instRes.json();
+    const instruments = instData.result;
+    if(!instruments || !instruments.length) return {iv:null, spot:null};
+    const expiries = [...new Set(instruments.map(i=>i.expiration_timestamp))].sort((a,b)=>a-b);
+    const nearExp = expiries[0];
+    const calls = instruments.filter(i=>i.expiration_timestamp===nearExp && i.option_type==='call');
+    if(!calls.length) return {iv:null, spot:null};
+    const probe = await fetchTicker(calls[0].instrument_name);
+    const spot = probe.underlying_price;
+    const strikes = calls.map(i=>i.strike);
+    const atmStrike = nearest(strikes, spot);
+    const atmName = calls.find(i=>i.strike===atmStrike).instrument_name;
+    const atmTicker = await fetchTicker(atmName);
+    return {iv: atmTicker.mark_iv, spot};
+  }catch(e){ return {iv:null, spot:null}; }
 }
 async function fetchRealizedVol(ccy){
-  const res = await fetch(`https://www.deribit.com/api/v2/public/get_historical_volatility?currency=${ccy}`);
-  const data = await res.json();
-  const arr = data.result;
-  return arr[arr.length-1][1];
+  try{
+    const res = await fetch(`https://www.deribit.com/api/v2/public/get_historical_volatility?currency=${ccy}`);
+    const data = await res.json();
+    const arr = data.result;
+    if(!arr || !arr.length) return null;
+    return arr[arr.length-1][1];
+  }catch(e){ return null; }
 }
 async function fetchFunding(ccy){
-  const t = await fetchTicker(`${ccy}-PERPETUAL`);
-  return (t.funding_8h ?? t.current_funding ?? null);
+  try{
+    const t = await fetchTicker(`${ccy}-PERPETUAL`);
+    return (t.funding_8h ?? t.current_funding ?? null);
+  }catch(e){ return null; }
 }
 async function fetchFng(){
   const res = await fetch('https://api.alternative.me/fng/?limit=1');
@@ -1293,20 +1303,22 @@ async function fetchDominance(){
   return {btcDom: data.data.market_cap_percentage.btc, totalMcap: data.data.total_market_cap.usd};
 }
 async function fetchPcrSkew(ccy){
-  const res = await fetch(`https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency=${ccy}&kind=option`);
-  const data = await res.json();
-  const rows = (data.result||[]).filter(r=>r.open_interest>0 && r.mark_iv!=null);
-  const calls = rows.filter(r=>r.instrument_name.endsWith('-C'));
-  const puts = rows.filter(r=>r.instrument_name.endsWith('-P'));
-  const callOI = calls.reduce((s,r)=>s+r.open_interest,0);
-  const putOI = puts.reduce((s,r)=>s+r.open_interest,0);
-  const avgCallIv = calls.length ? calls.reduce((s,r)=>s+r.mark_iv,0)/calls.length : null;
-  const avgPutIv = puts.length ? puts.reduce((s,r)=>s+r.mark_iv,0)/puts.length : null;
-  return {
-    pcr: callOI>0 ? putOI/callOI : null,
-    skew: (avgPutIv!=null && avgCallIv!=null) ? avgPutIv-avgCallIv : null,
-    totalOI: callOI+putOI
-  };
+  try{
+    const res = await fetch(`https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency=${ccy}&kind=option`);
+    const data = await res.json();
+    const rows = (data.result||[]).filter(r=>r.open_interest>0 && r.mark_iv!=null);
+    const calls = rows.filter(r=>r.instrument_name.endsWith('-C'));
+    const puts = rows.filter(r=>r.instrument_name.endsWith('-P'));
+    const callOI = calls.reduce((s,r)=>s+r.open_interest,0);
+    const putOI = puts.reduce((s,r)=>s+r.open_interest,0);
+    const avgCallIv = calls.length ? calls.reduce((s,r)=>s+r.mark_iv,0)/calls.length : null;
+    const avgPutIv = puts.length ? puts.reduce((s,r)=>s+r.mark_iv,0)/puts.length : null;
+    return {
+      pcr: callOI>0 ? putOI/callOI : null,
+      skew: (avgPutIv!=null && avgCallIv!=null) ? avgPutIv-avgCallIv : null,
+      totalOI: (callOI+putOI) || null
+    };
+  }catch(e){ return {pcr:null, skew:null, totalOI:null}; }
 }
 async function fetchMempool(){
   const [feeRes, poolRes] = await Promise.all([
@@ -1339,6 +1351,9 @@ async function refreshSignals(){
 }
 
 function verdictFor(id, s){
+  if(id!=='box' && (s.markIv==null || s.realizedVol==null)){
+    return {cls:'caution', label:'CAUTION', reason:`Live IV / realized-vol data isn't available for ${s.ccy} yet — Deribit may not publish it for this currency, or the order book is too thin right now. Verdict withheld rather than guessed.`};
+  }
   const ivPrem = s.markIv - s.realizedVol;
   const fundingPct = (s.funding8h||0)*100;
   const fundingExtreme = Math.abs(fundingPct) > 0.05;
@@ -1496,18 +1511,19 @@ function renderPredictionRadar(){
     return;
   }
   const s = signals;
-  const ivPrem = s.markIv - s.realizedVol;
+  const haveVol = s.markIv!=null && s.realizedVol!=null;
+  const ivPrem = haveVol ? (s.markIv - s.realizedVol) : null;
   const fundingPct = (s.funding8h||0)*100;
   const fundingExtreme = Math.abs(fundingPct) > 0.05;
   const fngExtreme = s.fng<=20 || s.fng>=80;
   const crowded = s.pcr!=null && (s.pcr>1.3 || s.pcr<0.6);
-  const volTag = ivPrem < -3 ? 'cheap' : (ivPrem > 3 ? 'rich' : 'fair');
+  const volTag = !haveVol ? 'unknown' : (ivPrem < -3 ? 'cheap' : (ivPrem > 3 ? 'rich' : 'fair'));
 
   const cards = [
     {label:`${s.ccy} spot`, val:`$${fmtNum(s.spot,0)}`},
     {label:'Implied vol (ATM)', val:fmtNum(s.markIv,1)+'%'},
     {label:'Realized vol', val:fmtNum(s.realizedVol,1)+'%'},
-    {label:'IV − RV spread', val:(ivPrem>=0?'+':'')+ivPrem.toFixed(1)+' pts', tag:volTag},
+    {label:'IV − RV spread', val:haveVol?((ivPrem>=0?'+':'')+ivPrem.toFixed(1)+' pts'):'not available', tag:volTag},
     {label:'Funding (8h)', val:fundingPct.toFixed(3)+'%', tag:fundingExtreme?'stretched':'calm'},
     {label:'Fear & Greed', val:`${s.fng} (${s.fngLabel})`, tag:fngExtreme?'extreme':'calm'},
     {label:'BTC dominance', val:fmtNum(s.btcDom,1)+'%'},
@@ -1522,7 +1538,11 @@ function renderPredictionRadar(){
   }
 
   let verdictCls, verdictLabel, bits=[];
-  if(crowded && volTag==='rich'){
+  if(!haveVol){
+    verdictCls='caution'; verdictLabel='DATA INCOMPLETE';
+    bits.push(`Deribit isn't publishing ATM implied vol and/or realized vol for ${s.ccy} right now — this asset may have too thin an options book, or the historical-volatility endpoint may not cover it.`);
+    bits.push('Every verdict that depends on the IV-vs-realized spread is withheld for this asset rather than guessed. Switch to BTC or ETH for the full signal set, or use the raw cards above for whatever did come back.');
+  } else if(crowded && volTag==='rich'){
     verdictCls='avoid'; verdictLabel='CROWDED — FAVOR LONG VOL';
     bits.push(`Put/Call OI ratio is lopsided at ${s.pcr.toFixed(2)} — positioning is crowded enough that a squeeze risk outweighs the rich premium.`);
     bits.push(`IV is running +${ivPrem.toFixed(1)} pts over realized, which would normally favor selling premium — but not against this level of crowding.`);
@@ -1658,17 +1678,17 @@ function renderVerdictContent(){
     </div>
     <table class="vtab">
       <tr><td>Verdict</td><td><span class="vpill v-${v.cls}">${v.label}</span></td></tr>
-      <tr><td>Spot (${s.ccy})</td><td>$${s.spot.toFixed(2)}</td></tr>
-      <tr><td>ATM mark IV</td><td>${s.markIv.toFixed(1)}%</td></tr>
-      <tr><td>Realized vol</td><td>${s.realizedVol.toFixed(1)}%</td></tr>
-      <tr><td>IV − realized</td><td>${(s.markIv-s.realizedVol>=0?'+':'')}${(s.markIv-s.realizedVol).toFixed(1)} pts</td></tr>
+      <tr><td>Spot (${s.ccy})</td><td>${s.spot!=null?'$'+s.spot.toFixed(2):'—'}</td></tr>
+      <tr><td>ATM mark IV</td><td>${s.markIv!=null?s.markIv.toFixed(1)+'%':'— (not published for this asset)'}</td></tr>
+      <tr><td>Realized vol</td><td>${s.realizedVol!=null?s.realizedVol.toFixed(1)+'%':'— (not published for this asset)'}</td></tr>
+      <tr><td>IV − realized</td><td>${(s.markIv!=null && s.realizedVol!=null)?((s.markIv-s.realizedVol>=0?'+':'')+(s.markIv-s.realizedVol).toFixed(1)+' pts'):'—'}</td></tr>
       <tr><td>Put/Call OI ratio</td><td>${s.pcr!=null?s.pcr.toFixed(2):'—'}</td></tr>
       <tr><td>Put − Call IV skew</td><td>${s.skew!=null?(s.skew>=0?'+':'')+s.skew.toFixed(1)+' pts':'—'}</td></tr>
       <tr><td>Total option OI (${s.ccy})</td><td>${s.totalOI!=null?s.totalOI.toLocaleString():'—'}</td></tr>
       <tr><td>Perp funding (8h)</td><td>${s.funding8h!=null?(s.funding8h*100).toFixed(4)+'%':'—'}</td></tr>
-      <tr><td>Fear &amp; Greed</td><td>${s.fng} (${s.fngLabel})</td></tr>
-      <tr><td>BTC dominance</td><td>${s.btcDom.toFixed(1)}%</td></tr>
-      <tr><td>Total crypto mcap</td><td>$${(s.totalMcap/1e9).toFixed(1)}B</td></tr>
+      <tr><td>Fear &amp; Greed</td><td>${s.fng!=null?s.fng+' ('+s.fngLabel+')':'—'}</td></tr>
+      <tr><td>BTC dominance</td><td>${s.btcDom!=null?s.btcDom.toFixed(1)+'%':'—'}</td></tr>
+      <tr><td>Total crypto mcap</td><td>${s.totalMcap!=null?'$'+(s.totalMcap/1e9).toFixed(1)+'B':'—'}</td></tr>
       ${s.mempoolFee!=null?`<tr><td>BTC mempool fee (sat/vB)</td><td>${s.mempoolFee}</td></tr><tr><td>BTC mempool backlog</td><td>${s.mempoolCount.toLocaleString()} tx</td></tr>`:''}
     </table>
     <div class="note">As of ${new Date(s.ts).toLocaleTimeString()}. Verdict is a transparent heuristic from IV-vs-realized spread, funding stretch, put/call positioning and sentiment extremes — not a guarantee. Cross-check against the strategy card's caution line above.</div>
@@ -1679,7 +1699,7 @@ function renderVerdictContent(){
 document.getElementById('vbRefresh').addEventListener('click', refreshSignals);
 
 /* ---------- Version check / update button ---------- */
-const CURRENT_VERSION = "1.7";
+const CURRENT_VERSION = "1.8";
 let updateAvailable = null; // set to remote version string when a newer one is seen
 
 async function doRefreshData(){
