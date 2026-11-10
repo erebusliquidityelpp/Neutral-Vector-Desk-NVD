@@ -249,6 +249,16 @@ table.vtab td:last-child{text-align:right;font-weight:600}
 .radarverdict ul{margin:8px 0 0;padding-left:18px;font-size:12.5px;color:var(--muted);line-height:1.6}
 .radarempty{font-size:12.5px;color:var(--muted);padding:20px;text-align:center;border:1px dashed var(--line);border-radius:10px}
 
+.newslist{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.newsitem{display:block;border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:10px 12px;text-decoration:none;color:inherit;transition:border-color .15s}
+.newsitem:hover{border-color:var(--accent)}
+.newsitem-top{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px}
+.newslabel{font-size:10px;text-transform:uppercase;letter-spacing:.04em;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.newslabel.up{color:var(--up);border-color:var(--up)}
+.newslabel.down{color:var(--down);border-color:var(--down)}
+.newsmeta{font-size:11px;color:var(--muted);font-family:var(--mono)}
+.newstitle{font-size:13px;line-height:1.4}
+
 .exgroup{margin-bottom:20px}
 .exgroup h4{font-size:14px;margin:0 0 8px;color:var(--accent2)}
 .extbl{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:6px}
@@ -347,7 +357,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
       <a href="#apikeys">API Keys</a>
       <a href="#account">Account</a>
     </nav>
-    <span class="chip verchip" id="verChip">v2.11</span>
+    <span class="chip verchip" id="verChip">v2.12</span>
     <span class="chip" id="welcomeChip" style="display:none"></span>
     <button class="btn sm" id="globalRefresh">⟳ Refresh</button>
     <span class="chip"><span class="dot"></span> Client-side · no stored data</span>
@@ -523,6 +533,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
       <p class="sdesc">Every raw number the live feeds returned, side by side, plus the desk's own synthesized read on the market — the reasoning the per-strategy verdicts are each built from, laid out as a single call with its "why".</p>
     </div>
     <div id="radarHost"></div>
+    <div id="newsHost" style="margin-top:20px"></div>
   </div>
 </section>
 
@@ -1287,6 +1298,7 @@ function renderStubPanel(host,label,providerLabel,storeKey,note){
 }
 
 /* --- Forex: free live spot via Frankfurter (ECB rates), no options data --- */
+let lastFxPair = 'EUR/USD';
 function renderForexPanel(host){
   const pairs = ['EUR/USD','GBP/USD','USD/JPY','USD/CHF','AUD/USD','USD/CAD'];
   host.innerHTML = `
@@ -1296,7 +1308,7 @@ function renderForexPanel(host){
         <span class="lp-status" id="fxStatus"><span class="ld"></span>Idle</span>
       </div>
       <div class="lp-row">
-        <div class="field"><label>Pair</label><select id="fxPair">${pairs.map(p=>`<option value="${p}">${p}</option>`).join('')}</select></div>
+        <div class="field"><label>Pair</label><select id="fxPair">${pairs.map(p=>`<option value="${p}" ${p===lastFxPair?'selected':''}>${p}</option>`).join('')}</select></div>
         <button class="btn primary" id="fxFetch">Fetch live spot</button>
       </div>
       <div class="note">Spot rates come live from the ECB reference feed via Frankfurter.app (free, no key). FX <b>options</b> (strikes/IV) are an institutional OTC market with no public retail feed — set a provider key below if you have one, otherwise keep entering strikes/premiums by hand.</div>
@@ -1309,6 +1321,7 @@ function renderForexPanel(host){
     setKey('fx', document.getElementById('key-fx').value.trim());
   });
   document.getElementById('fxFetch').addEventListener('click', fetchForexSpot);
+  document.getElementById('fxPair').addEventListener('change', (e)=>{ lastFxPair = e.target.value; renderNewsPanel(); });
 }
 
 async function fetchForexSpot(){
@@ -1434,7 +1447,7 @@ function initMacroPanel(){
 
 /* --- API Keys: centralized management for every market-data key on the desk --- */
 const API_KEY_FIELDS = [
-  {store:'macro', label:'Alpha Vantage', sub:'Macro Fundamentals, and Stocks — live option chain (recommended: free, no US-residency signup, options included on the free tier)', help:'Free key: alphavantage.co/support/#api-key'},
+  {store:'macro', label:'Alpha Vantage', sub:'Macro Fundamentals, Stocks — live option chain, and Fundamentals & News (Prediction Radar) — one free key, no US-residency signup, all three included on the free tier', help:'Free key: alphavantage.co/support/#api-key'},
   {store:'tradier', label:'Tradier', sub:'Stocks — live option chain (access token; sandbox signup requires a US address)', help:'Free developer sandbox: developer.tradier.com'},
   {store:'polygon', label:'Polygon.io', sub:'Stocks — live option chain (free tier does NOT include options data — needs a paid plan)', help:'Free tier: polygon.io/pricing'},
   {store:'fx', label:'FX options provider', sub:'Optional — institutional OTC feed, only if you have one', help:''},
@@ -2128,6 +2141,7 @@ function updateVerdictHead(){
     signals = null;
     renderVerdictMenu(); renderVerdictContent(); renderPredictionRadar();
   }
+  renderNewsPanel();
 }
 
 /* ---------- Market Signal Verdicts (all free, no key) ---------- */
@@ -2408,6 +2422,155 @@ function renderWatchlist(){
 function fmtPct(x, d){ return x==null ? '—' : (x*100).toFixed(d==null?2:d)+'%'; }
 function fmtNum(x, d){ return x==null ? '—' : x.toFixed(d==null?1:d); }
 
+/* ---------- Fundamentals & News (Alpha Vantage News & Sentiment, free, global, no US-residency signup) ---------- */
+const newsCache = {};
+const AV_NEWS_TOPICS_BONDS = 'economy_macro,economy_monetary,economy_fiscal,financial_markets';
+
+function newsContextForAsset(){
+  if(activeAsset==='crypto'){
+    const sel = document.getElementById('vbCcy');
+    const ccy = sel ? sel.value : 'BTC';
+    return {key:`crypto:${ccy}`, label:`${ccy} (crypto)`, tickers:`CRYPTO:${ccy}`, topics:null};
+  }
+  if(activeAsset==='stocks'){
+    const inp = document.getElementById('stkSymbol');
+    const sym = (inp && inp.value.trim().toUpperCase()) || lastStockSymbol;
+    if(!sym) return null;
+    return {key:`stocks:${sym}`, label:sym, tickers:sym, topics:null};
+  }
+  if(activeAsset==='forex'){
+    const sel = document.getElementById('fxPair');
+    const pair = (sel && sel.value) || lastFxPair;
+    const [base,quote] = pair.split('/');
+    return {key:`forex:${pair}`, label:pair, tickers:`FOREX:${base},FOREX:${quote}`, topics:null};
+  }
+  return {key:'bonds:macro', label:'Rates & macro (no public bond-options ticker exists)', tickers:null, topics:AV_NEWS_TOPICS_BONDS};
+}
+
+function newsSentimentVerdict(score){
+  if(score>=0.35) return {label:'BULLISH SKEW', cls:'go'};
+  if(score>=0.15) return {label:'SOMEWHAT BULLISH SKEW', cls:'go'};
+  if(score>-0.15) return {label:'NEUTRAL / MIXED', cls:'caution'};
+  if(score>-0.35) return {label:'SOMEWHAT BEARISH SKEW', cls:'avoid'};
+  return {label:'BEARISH SKEW', cls:'avoid'};
+}
+
+function newsLabelCls(label){
+  if(!label) return '';
+  if(label.includes('Bullish')) return 'up';
+  if(label.includes('Bearish')) return 'down';
+  return '';
+}
+
+function fmtNewsTime(t){
+  if(!t || t.length<15) return '';
+  const iso = `${t.slice(0,4)}-${t.slice(4,6)}-${t.slice(6,8)}T${t.slice(9,11)}:${t.slice(11,13)}:${t.slice(13,15)}Z`;
+  const d = new Date(iso);
+  if(isNaN(d.getTime())) return '';
+  const diffH = (Date.now()-d.getTime())/3600000;
+  if(diffH<1) return `${Math.max(1,Math.round(diffH*60))}m ago`;
+  if(diffH<48) return `${Math.round(diffH)}h ago`;
+  return d.toLocaleDateString();
+}
+
+async function fetchNewsSentiment(){
+  const ctx = newsContextForAsset();
+  if(!ctx) return;
+  const key = getKeys().macro;
+  if(!key) return;
+  const st = document.getElementById('newsStatus');
+  const btn = document.getElementById('newsRefresh');
+  if(st) st.innerHTML = `<span class="ld"></span>Loading…`;
+  if(btn) btn.disabled = true;
+  try{
+    const params = new URLSearchParams({function:'NEWS_SENTIMENT', sort:'LATEST', limit:'15', apikey:key});
+    if(ctx.tickers) params.set('tickers', ctx.tickers);
+    if(ctx.topics) params.set('topics', ctx.topics);
+    const res = await fetch(`https://www.alphavantage.co/query?${params.toString()}`);
+    const data = await res.json();
+    if(data.Information || data.Note || data['Error Message']) throw new Error(data.Information || data.Note || data['Error Message']);
+    const feed = data.feed || [];
+    if(!feed.length){ newsCache[ctx.key] = {articles:[], verdict:null, fetchedAt:Date.now()}; renderNewsPanel(); return; }
+    const tickerList = ctx.tickers ? ctx.tickers.split(',') : [];
+    let wsum=0, wtot=0;
+    const articles = feed.map(a=>{
+      let score=null, rel=null;
+      if(tickerList.length && Array.isArray(a.ticker_sentiment)){
+        const match = a.ticker_sentiment.find(t=>tickerList.includes(t.ticker));
+        if(match){ score=parseFloat(match.ticker_sentiment_score); rel=parseFloat(match.relevance_score); }
+      }
+      if(score==null || isNaN(score)){ score=parseFloat(a.overall_sentiment_score); rel=1; }
+      if(!isNaN(score)){ wsum += score*(rel||1); wtot += (rel||1); }
+      return {title:a.title, url:a.url, source:a.source, time:a.time_published, label:a.overall_sentiment_label, score, rel};
+    });
+    const aggScore = wtot>0 ? wsum/wtot : 0;
+    const verdict = Object.assign({score:aggScore}, newsSentimentVerdict(aggScore));
+    newsCache[ctx.key] = {articles, verdict, fetchedAt:Date.now()};
+  }catch(e){
+    newsCache[ctx.key] = {error:e.message, fetchedAt:Date.now()};
+  }
+  renderNewsPanel();
+}
+
+function renderNewsPanel(){
+  const host = document.getElementById('newsHost');
+  if(!host) return;
+  const ctx = newsContextForAsset();
+  const key = getKeys().macro;
+  if(!ctx){
+    host.innerHTML = `<div class="lp-head"><b>Fundamentals &amp; News</b></div><div class="radarempty">Load a symbol in the Stocks tab above first, then come back here for its news.</div>`;
+    return;
+  }
+  if(!key){
+    host.innerHTML = `<div class="lp-head"><b>Fundamentals &amp; News</b></div><div class="radarempty">No Alpha Vantage key saved — add one in <a href="#apikeys">API Keys</a> to enable this (same free key already used for Macro Fundamentals and the Stocks option chain).</div>`;
+    return;
+  }
+  const cache = newsCache[ctx.key];
+  let body;
+  if(!cache){
+    body = `<div class="note">Pulls the latest free, public headlines relevant to <b>${ctx.label}</b> from global outlets (Alpha Vantage News &amp; Sentiment — macro, earnings, policy, and asset-specific coverage) and synthesizes a bullish/bearish skew read for it. Manual refresh only — this shares your 25-calls/day Alpha Vantage free-tier budget with Macro Fundamentals and the Stocks tab, so it isn't pulled automatically.</div>`;
+  } else if(cache.error){
+    body = `<div class="radarempty">${cache.error}</div>`;
+  } else if(!cache.articles.length){
+    body = `<div class="radarempty">No recent public articles matched ${ctx.label}.</div>`;
+  } else {
+    const v = cache.verdict;
+    const impactLine = v.cls==='go'
+      ? `Coverage skews ${v.label.replace(' SKEW','').toLowerCase()} — that's a directional catalyst sitting under the position right now, which favors long-vol/directional structures (straddle, strangle, the backspreads) over short-premium ones that need the underlying to sit still.`
+      : v.cls==='avoid'
+      ? `Coverage skews ${v.label.replace(' SKEW','').toLowerCase()} — same catalyst-risk read as a bullish skew, just pointed the other way: favor long-vol/directional structures over short-premium ones here too.`
+      : `Coverage is mixed or muted — no clear directional catalyst in the headlines right now, which is the more comfortable backdrop for short-premium, range-bound structures (condor, butterfly, calendar).`;
+    body = `
+      <div class="radarverdict">
+        <h4><span class="vpill v-${v.cls}">${v.label}</span> <span style="color:var(--muted);font-size:12px;font-weight:400">sentiment score ${v.score.toFixed(2)} (Alpha Vantage, −1 to +1)</span></h4>
+        <ul><li>${impactLine}</li></ul>
+      </div>
+      <div class="newslist">
+        ${cache.articles.slice(0,12).map(a=>`
+          <a class="newsitem" href="${a.url}" target="_blank" rel="noopener noreferrer">
+            <div class="newsitem-top">
+              <span class="newslabel ${newsLabelCls(a.label)}">${a.label||'—'}</span>
+              <span class="newsmeta">${a.source||''}${a.time?' · '+fmtNewsTime(a.time):''}${a.rel!=null && !isNaN(a.rel)?' · relevance '+a.rel.toFixed(2):''}</span>
+            </div>
+            <div class="newstitle">${a.title}</div>
+          </a>
+        `).join('')}
+      </div>
+      <p class="acnote" style="margin-top:10px">Headlines and sentiment scoring from Alpha Vantage's News &amp; Sentiment feed (free tier, global outlets) — this is a skew in the coverage, not a price guarantee. Read the article itself before treating it as a real catalyst.</p>
+    `;
+  }
+  host.innerHTML = `
+    <div class="lp-head">
+      <b>Fundamentals &amp; News — ${ctx.label}</b>
+      <span class="lp-status" id="newsStatus">${cache&&cache.fetchedAt?`<span class="ld ${cache.error?'err':'ok'}"></span>Updated ${new Date(cache.fetchedAt).toLocaleTimeString()}`:`<span class="ld"></span>Not loaded yet`}</span>
+    </div>
+    <div class="lp-row"><button class="btn primary" id="newsRefresh">Refresh news</button></div>
+    ${body}
+  `;
+  const btn = document.getElementById('newsRefresh');
+  if(btn) btn.addEventListener('click', fetchNewsSentiment);
+}
+
 function renderPredictionRadar(){
   const host = document.getElementById('radarHost');
   if(!signals){
@@ -2635,7 +2798,7 @@ function renderVerdictContent(){
 document.getElementById('vbRefresh').addEventListener('click', refreshSignals);
 
 /* ---------- Version check / update button ---------- */
-const CURRENT_VERSION = "2.11";
+const CURRENT_VERSION = "2.12";
 let updateAvailable = null; // set to remote version string when a newer one is seen
 
 async function doRefreshData(){
