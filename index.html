@@ -34,6 +34,9 @@ button,select,input{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 a{color:var(--accent)}
 .wrap{max-width:1400px;margin:0 auto;padding:0 8px}
+body.landing-mode .fullsection{display:none}
+body.landing-mode nav.links a{position:relative}
+body.landing-mode nav.links a:not([href="#account"])::after{content:'🔒';font-size:9px;margin-left:4px;opacity:.6;vertical-align:2px}
 
 /* header */
 header.top{position:sticky;top:0;z-index:20;background:rgba(11,15,20,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);box-shadow:0 1px 0 rgba(226,153,95,.08)}
@@ -80,6 +83,12 @@ nav.links a:hover{color:var(--fg)}
 .lfcard.locked{cursor:default}
 .lfcard .lflock{position:absolute;top:16px;right:16px;font-size:13px;opacity:.55}
 .lfcta{display:flex;justify-content:center;margin-top:28px}
+.lfglimpse{margin-top:14px;padding:9px 11px;border:1px dashed var(--line);border-radius:8px;background:var(--bg);font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.5}
+.lfglimpse.lffade{position:relative;max-height:54px;overflow:hidden;font-style:italic;color:var(--silver)}
+.lfglimpse.lffade::after{content:'';position:absolute;left:0;right:0;bottom:0;height:28px;background:linear-gradient(180deg,transparent,var(--bg))}
+.lfglimpse.lfpills{display:flex;gap:6px;flex-wrap:wrap;border-style:dashed}
+.lfspark{width:100%;height:28px;display:block;margin-bottom:6px;opacity:.85}
+.blurval{filter:blur(3.5px);user-select:none;color:var(--fg)}
 
 /* section shell */
 section{padding:56px 0;border-bottom:1px solid var(--line)}
@@ -284,7 +293,8 @@ table.vtab td:last-child{text-align:right;font-weight:600}
 footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
 </style>
 </head>
-<body>
+<body class="landing-mode">
+<script>try{ if(localStorage.getItem('nvd_token')){ document.body.classList.remove('landing-mode'); } }catch(e){}</script>
 
 <header class="top">
   <div class="wrap topbar">
@@ -322,7 +332,8 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
       <a href="#manual">Manual</a>
       <a href="#account">Account</a>
     </nav>
-    <span class="chip verchip" id="verChip">v2.2</span>
+    <span class="chip verchip" id="verChip">v2.3</span>
+    <span class="chip" id="welcomeChip" style="display:none"></span>
     <button class="btn sm" id="globalRefresh">⟳ Refresh</button>
     <span class="chip"><span class="dot"></span> Client-side · no stored data</span>
   </div>
@@ -363,37 +374,59 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
         <span class="lflock">🔒</span>
         <div class="lficon">📐</div>
         <h4>Builder</h4>
-        <p>Model any of the 17 structures leg by leg and see max profit, max loss, breakevens and the payoff curve update instantly.</p>
+        <p>Model any of the 17 structures leg by leg — max profit, max loss, breakevens, live payoff curve.</p>
+        <div class="lfglimpse">
+          <svg viewBox="0 0 120 36" class="lfspark"><polyline points="0,30 20,30 45,8 65,8 90,30 120,30" fill="none" stroke="var(--accent2)" stroke-width="2"/></svg>
+          <span class="blurval">Max profit $••,•••</span>
+        </div>
       </div>
       <div class="lfcard locked">
         <span class="lflock">🔒</span>
         <div class="lficon">📡</div>
         <h4>Signal verdicts &amp; Prediction Radar</h4>
-        <p>GO / CAUTION / AVOID per structure, built from live IV vs realized vol, funding, Fear &amp; Greed, OI skew and more.</p>
+        <p>Per-structure GO / CAUTION / AVOID from live IV vs realized vol, funding, Fear &amp; Greed, OI skew.</p>
+        <div class="lfglimpse lfpills">
+          <span class="vpill v-go">GO</span><span class="vpill v-caution">CAUTION</span><span class="vpill v-avoid">AVOID</span>
+        </div>
       </div>
       <div class="lfcard locked">
         <span class="lflock">🔒</span>
         <div class="lficon">🗓️</div>
         <h4>Calendar</h4>
-        <p>Live options-expiry calendar, plus a ForexFactory/CryptoCraft-style macro event schedule — CPI, NFP, FOMC and more.</p>
+        <p>Live options-expiry calendar, plus a ForexFactory/CryptoCraft-style macro event schedule.</p>
+        <div class="lfglimpse">
+          <span class="blurval">CPI · ••:•• · Impact: ███</span>
+        </div>
       </div>
       <div class="lfcard locked">
         <span class="lflock">🔒</span>
         <div class="lficon">📓</div>
         <h4>Advanced Journal</h4>
-        <p>Auto-captures the live structure and signal state when you log a trade — no manual entry. Realized P&amp;L, win rate, CSV/JSON export.</p>
+        <p>Auto-captures the live structure and signal state when you log a trade — no manual entry.</p>
+        <div class="lfglimpse">
+          <span class="blurval">Win rate ••%</span> &nbsp; <span class="blurval">P&amp;L $•••</span>
+        </div>
       </div>
       <div class="lfcard locked">
         <span class="lflock">🔒</span>
         <div class="lficon">🎫</div>
         <h4>Trade ticket &amp; real execution</h4>
-        <p>A copyable order ticket by default. Sign in and add exchange keys to send real orders across six major exchanges.</p>
+        <p>A copyable order ticket by default. Sign in to send real orders to your own exchange account.</p>
+        <div class="lfglimpse">Hyperliquid · Binance · Bybit · OKX · Deribit · Coinbase</div>
       </div>
       <div class="lfcard locked">
         <span class="lflock">🔒</span>
         <div class="lficon">🎓</div>
         <h4>Vocabulary &amp; Academy</h4>
-        <p>Every term, every verdict threshold, a step-by-step process, and how equity options differ from crypto.</p>
+        <p>Every term, every verdict threshold, a step-by-step process, and crypto-vs-equity mechanics.</p>
+        <div class="lfglimpse">IV − RV spread — <span class="blurval">positive means ██████ ████ than realized</span></div>
+      </div>
+      <div class="lfcard locked">
+        <span class="lflock">🔒</span>
+        <div class="lficon">📖</div>
+        <h4>Manual</h4>
+        <p>The internal reference for how the scanner thinks — view-only, watermarked, no file to download.</p>
+        <div class="lfglimpse lffade">"Neutral Vector Desk is a payoff builder and signal reader for non-directional options structures — straddles, strangles, condors, butterflies, calendars, ratio spreads, backspreads, ladders, the reverse condor, guts, and the box spread."</div>
       </div>
     </div>
     <div class="lfcta">
@@ -402,7 +435,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
   </div>
 </section>
 
-<section id="strategies">
+<section id="strategies" class="fullsection">
   <div class="wrap">
     <div class="shead">
       <div class="kicker">Strategy library</div>
@@ -413,7 +446,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
   </div>
 </section>
 
-<section id="builder">
+<section id="builder" class="fullsection">
   <div class="wrap">
     <div class="shead">
       <div class="kicker">Payoff builder</div>
@@ -453,7 +486,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
   </div>
 </section>
 
-<section id="watchlist">
+<section id="watchlist" class="fullsection">
   <div class="wrap">
     <div class="shead">
       <div class="kicker">Watchlist</div>
@@ -464,7 +497,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
   </div>
 </section>
 
-<section id="radar">
+<section id="radar" class="fullsection">
   <div class="wrap">
     <div class="shead">
       <div class="kicker">Prediction Radar</div>
@@ -475,7 +508,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
   </div>
 </section>
 
-<section id="exchanges">
+<section id="exchanges" class="fullsection">
   <div class="wrap">
     <div class="shead">
       <div class="kicker">Exchanges</div>
@@ -528,7 +561,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
   </div>
 </section>
 
-<section id="macro">
+<section id="macro" class="fullsection">
   <div class="wrap">
     <div class="shead">
       <div class="kicker">Macro Fundamentals</div>
@@ -562,7 +595,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
   </div>
 </section>
 
-<section id="calendar">
+<section id="calendar" class="fullsection">
   <div class="wrap">
     <div class="shead">
       <div class="kicker">Calendar</div>
@@ -597,7 +630,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
   </div>
 </section>
 
-<section id="journal">
+<section id="journal" class="fullsection">
   <div class="wrap">
     <div class="shead">
       <div class="kicker">Journal</div>
@@ -621,7 +654,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
   </div>
 </section>
 
-<section id="academy">
+<section id="academy" class="fullsection">
   <div class="wrap">
     <div class="shead">
       <div class="kicker">Vocabulary &amp; Academy</div>
@@ -728,7 +761,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
   </div>
 </section>
 
-<section id="manual">
+<section id="manual" class="fullsection">
   <div class="wrap">
     <div class="shead">
       <div class="kicker">Manual</div>
@@ -2073,7 +2106,7 @@ function renderVerdictContent(){
 document.getElementById('vbRefresh').addEventListener('click', refreshSignals);
 
 /* ---------- Version check / update button ---------- */
-const CURRENT_VERSION = "2.2";
+const CURRENT_VERSION = "2.3";
 let updateAvailable = null; // set to remote version string when a newer one is seen
 
 async function doRefreshData(){
@@ -2340,6 +2373,23 @@ function renderJournal(){
   host.querySelectorAll('[data-close]').forEach(b=>b.onclick = ()=>closeJournalEntry(b.dataset.close));
   host.querySelectorAll('[data-del]').forEach(b=>b.onclick = ()=>deleteJournalEntry(b.dataset.del));
 }
+/* ---------- Landing mode: teaser view by default, full desk once entered or signed in ---------- */
+function exitLandingMode(){
+  document.body.classList.remove('landing-mode');
+}
+document.addEventListener('click', (e)=>{
+  const a = e.target.closest('a[href^="#"]');
+  if(!a) return;
+  const id = a.getAttribute('href').slice(1);
+  const target = document.getElementById(id);
+  if(!target) return;
+  if(document.body.classList.contains('landing-mode') && target.classList.contains('fullsection')){
+    e.preventDefault();
+    exitLandingMode();
+    requestAnimationFrame(()=>requestAnimationFrame(()=>target.scrollIntoView({behavior:'smooth', block:'start'})));
+  }
+});
+
 /* ---------- Backend account: API base, auth, encrypted key vault, sync ---------- */
 let apiBase = (()=>{ try{ return localStorage.getItem('nvd_api_base')||''; }catch(e){ return ''; } })();
 let authToken = (()=>{ try{ return localStorage.getItem('nvd_token')||''; }catch(e){ return ''; } })();
@@ -2370,10 +2420,17 @@ function renderAccountConn(){
   st.innerHTML = apiBase ? `<span class="ld ok"></span>Set: ${apiBase}` : `<span class="ld"></span>Not configured`;
 }
 
+function displayNameFor(user){
+  if(!user || !user.email) return '';
+  const local = user.email.split('@')[0];
+  return local.charAt(0).toUpperCase() + local.slice(1);
+}
+
 function renderAuthPanel(){
   const host = document.getElementById('authHost');
   const st = document.getElementById('authStatus');
   const keysPanel = document.getElementById('keysPanel');
+  const welcome = document.getElementById('welcomeChip');
   if(authToken && authUser){
     st.innerHTML = `<span class="ld ok"></span>Signed in as ${authUser.email}`;
     host.innerHTML = `<div class="lp-row"><button class="btn" id="logoutBtn">Sign out</button></div>`;
@@ -2381,9 +2438,13 @@ function renderAuthPanel(){
     keysPanel.style.display = '';
     loadKeys();
     syncFromBackend();
+    welcome.style.display = '';
+    welcome.textContent = `Welcome, ${displayNameFor(authUser)}`;
+    exitLandingMode();
   } else {
     st.innerHTML = `<span class="ld"></span>Signed out`;
     keysPanel.style.display = 'none';
+    welcome.style.display = 'none';
     host.innerHTML = `
       <div class="lp-row" style="flex-wrap:wrap">
         <div class="field" style="flex:1"><label>Email</label><input type="email" id="authEmail"></div>
