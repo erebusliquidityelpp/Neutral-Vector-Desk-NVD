@@ -233,6 +233,10 @@ table.vtab td:last-child{text-align:right;font-weight:600}
 .manualdoc .mdfoot{border-top:1px solid var(--line);padding:10px 16px;font-size:11px;color:var(--muted);background:var(--surface)}
 @media print{ .manualdoc{display:none !important} body::after{content:"Printing/exporting this manual is disabled."; display:block; padding:40px; text-align:center;} }
 
+.radarcard .tag.estimate{color:var(--accent2);border-color:var(--accent2)}
+.macronote{font-size:12px;color:var(--muted);line-height:1.6;border-top:1px dashed var(--line);padding-top:10px;margin-top:4px}
+.macronote b{color:var(--fg)}
+
 footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
 </style>
 </head>
@@ -267,10 +271,11 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
       <a href="#watchlist">Watchlist</a>
       <a href="#radar">Prediction Radar</a>
       <a href="#exchanges">Exchanges</a>
+      <a href="#macro">Macro Fundamentals</a>
       <a href="#academy">Vocabulary &amp; Academy</a>
       <a href="#manual">Manual</a>
     </nav>
-    <span class="chip verchip" id="verChip">v1.6</span>
+    <span class="chip verchip" id="verChip">v1.7</span>
     <button class="btn sm" id="globalRefresh">⟳ Refresh</button>
     <span class="chip"><span class="dot"></span> Client-side · no stored data</span>
   </div>
@@ -413,6 +418,40 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
   </div>
 </section>
 
+<section id="macro">
+  <div class="wrap">
+    <div class="shead">
+      <div class="kicker">Macro Fundamentals</div>
+      <h3 class="stitle">How fundamentals-based prediction actually works</h3>
+      <p class="sdesc">There are only three real mechanisms behind any "they knew the number before it came out" claim — this panel uses the one that's genuinely free and fetches it live instead of asking you to type numbers in.</p>
+    </div>
+
+    <div class="livepanel">
+      <div class="lp-head"><b>The three real mechanisms</b></div>
+      <div class="note">
+        <b>1. Survey consensus</b> — outlets like Trading Economics, Econoday, and Bloomberg poll dozens of economists before each release and publish the median guess (e.g. "CPI forecast: 3.1%"). This is a licensed, paid product — there is no free, keyless API that publishes it.<br><br>
+        <b>2. Market-priced expectations</b> — prices already baked into other instruments reveal what the market collectively expects: Treasury yields and TIPS breakevens price in inflation expectations, Fed funds futures price in rate-decision odds, and crypto funding/options skew price in positioning. Some of this is free; this desk already uses the crypto side of it (funding rate, PCR, skew) everywhere else on the site.<br><br>
+        <b>3. Trend / momentum nowcasting</b> — extrapolating the next print from the recent trend in actual released data. It's genuinely free to compute from free historical data, but it is not a forecast in the economist-consensus sense — it just continues the recent pattern, which real releases break constantly.
+      </div>
+      <div class="note">This panel below runs #3 for you automatically, live, from free data — no manual entry. #1 stays a paid product (flagged honestly, not faked); #2 is partially covered via the 10-Year Treasury yield card as a genuine market-priced reference point.</div>
+    </div>
+
+    <div class="livepanel">
+      <div class="lp-head">
+        <b>Live macro data — CPI, unemployment, Fed funds rate, 10Y yield</b>
+        <span class="lp-status" id="macroStatus"><span class="ld"></span>Idle</span>
+      </div>
+      <div class="keybox">
+        <div class="field"><label>Alpha Vantage API key (free)</label><input type="password" id="key-macro" placeholder="paste free key"></div>
+        <button class="btn" id="savekey-macro">Save key</button>
+        <button class="btn primary" id="macroFetch">Refresh macro data</button>
+      </div>
+      <div class="note">Get a free key in seconds at <code>alphavantage.co/support/#api-key</code> — no card, no paid tier required for these endpoints (rate-limited to 25 calls/day on the free tier, which this panel respects by batching one call per indicator per refresh). The key is stored only in your browser's local storage.</div>
+      <div id="macroHost"></div>
+    </div>
+  </div>
+</section>
+
 <section id="academy">
   <div class="wrap">
     <div class="shead">
@@ -447,6 +486,9 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
         <dt>BTC dominance</dt><dd>Bitcoin's share of total crypto market cap (CoinGecko). Rising dominance usually means capital rotating toward BTC and away from alts (risk-off within crypto); falling dominance usually means the opposite.</dd>
         <dt>GO / CAUTION / AVOID</dt><dd>The desk's shorthand verdict per structure. GO = the live signals line up with what that structure needs to work. CAUTION = no strong edge either way — the math still works, but nothing above is doing you a favor. AVOID = the live signals are actively working against this specific structure's weak point.</dd>
         <dt>"Crowded" positioning</dt><dd>This desk's label for PCR above 1.3 or below 0.6 — positioning lopsided enough that a squeeze back the other way is a real risk, which is specifically bad for anything short premium with a tail (condor, butterfly, ratio spreads, ladder).</dd>
+        <dt>Economist survey consensus</dt><dd>The "expected" number you see quoted before a CPI, NFP, or other macro release (e.g. "CPI forecast: 3.1%"). Compiled by polling economists at banks and funds. This is a paid product (Trading Economics, Econoday, Bloomberg) — no free keyless API publishes it.</dd>
+        <dt>Market-priced expectation</dt><dd>What a forward-looking price already implies about the future — a bond yield pricing in expected inflation, a futures curve pricing in an expected rate move, a funding rate pricing in crowd positioning. Not a guess; it's what the market is already paying for.</dd>
+        <dt>Desk trend estimate ("next print")</dt><dd>This desk's own naive extrapolation in the Macro Fundamentals panel — the average of the last 3 month-over-month moves in an actual released series, carried forward one step. It is not a survey consensus and does not claim to be — real releases break trend constantly.</dd>
       </dl>
     </details>
 
@@ -543,6 +585,8 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
           <tr><td>CoinGecko</td><td>BTC dominance, total crypto market cap</td><td>Free, no key</td></tr>
           <tr><td>mempool.space</td><td>BTC mempool backlog, fee estimates</td><td>Free, no key</td></tr>
           <tr><td>Frankfurter.app</td><td>ECB FX spot reference rates</td><td>Free, no key</td></tr>
+          <tr><td>Alpha Vantage</td><td>CPI, unemployment rate, Fed funds rate, 10Y Treasury yield (actual releases)</td><td>Free — requires a free signup key (25 calls/day)</td></tr>
+          <tr><td>Economist survey consensus (Trading Economics, Econoday, Bloomberg)</td><td>The "expected" number before a release (e.g. "CPI forecast: 3.1%")</td><td>Paid — no free keyless API publishes this</td></tr>
           <tr><td>Equity/ETF options chains (CBOE, Nasdaq, NYSE)</td><td>Real-time options chain data</td><td>Paid — licensed feed or broker API required</td></tr>
           <tr><td>FX options pricing (interbank/OTC)</td><td>Currency-pair option pricing</td><td>Paid — no public exchange exists; vendor/bank feeds only</td></tr>
           <tr><td>Treasury / rates options (CME)</td><td>Bond &amp; rates futures options</td><td>Paid data license</td></tr>
@@ -962,6 +1006,99 @@ async function fetchForexSpot(){
   }catch(e){
     st.innerHTML = `<span class="ld err"></span>Fetch failed — network blocked or rate unavailable`;
   }
+}
+
+/* --- Macro Fundamentals: live CPI/Unemployment/Fed Funds/10Y via Alpha Vantage (free key) --- */
+async function fetchAV(func, extra, apikey){
+  const params = new URLSearchParams({function:func, apikey, ...(extra||{})});
+  const res = await fetch(`https://www.alphavantage.co/query?${params.toString()}`);
+  const data = await res.json();
+  if(data['Error Message']) throw new Error(data['Error Message']);
+  if(data['Note']) throw new Error('Rate limit hit — free tier allows 25 calls/day.');
+  if(data['Information']) throw new Error(data['Information']);
+  return data;
+}
+function seriesFromAV(data){
+  const arr = (data.data||[]).map(d=>({date:d.date, value:parseFloat(d.value)})).filter(d=>!isNaN(d.value));
+  arr.sort((a,b)=> new Date(b.date) - new Date(a.date));
+  return arr;
+}
+function yoySeries(series, months){
+  const out = [];
+  for(let i=0;i<months;i++){
+    if(series.length <= i+12) break;
+    out.push({date: series[i].date, yoy: (series[i].value/series[i+12].value - 1)*100});
+  }
+  return out;
+}
+function naiveTrend(valuesNewestFirst){
+  if(!valuesNewestFirst || valuesNewestFirst.length<4) return null;
+  const d1=valuesNewestFirst[0]-valuesNewestFirst[1];
+  const d2=valuesNewestFirst[1]-valuesNewestFirst[2];
+  const d3=valuesNewestFirst[2]-valuesNewestFirst[3];
+  return valuesNewestFirst[0] + (d1+d2+d3)/3;
+}
+
+function renderMacroStub(host){
+  host.innerHTML = `<div class="macronote">No Alpha Vantage key saved yet — paste a free key above and hit "Refresh macro data". Nothing below is estimated or shown until that live call actually succeeds.</div>`;
+}
+
+async function refreshMacro(){
+  const host = document.getElementById('macroHost');
+  const st = document.getElementById('macroStatus');
+  const apikey = (getKeys().macro||'').trim();
+  if(!apikey){ renderMacroStub(host); st.innerHTML = `<span class="ld"></span>Idle — no key saved`; return; }
+  st.innerHTML = `<span class="ld"></span>Loading…`;
+  try{
+    const cpiRaw = await fetchAV('CPI', {interval:'monthly'}, apikey);
+    const unRaw  = await fetchAV('UNEMPLOYMENT', {}, apikey);
+    const ffrRaw = await fetchAV('FEDERAL_FUNDS_RATE', {interval:'monthly'}, apikey);
+    const t10Raw = await fetchAV('TREASURY_YIELD', {interval:'monthly', maturity:'10year'}, apikey);
+
+    const cpiSeries = seriesFromAV(cpiRaw);
+    const cpiYoy = yoySeries(cpiSeries, 6);
+    const cpiEstimate = naiveTrend(cpiYoy.map(x=>x.yoy));
+
+    const unSeries = seriesFromAV(unRaw);
+    const unEstimate = naiveTrend(unSeries.slice(0,4).map(x=>x.value));
+
+    const ffrSeries = seriesFromAV(ffrRaw);
+    const t10Series = seriesFromAV(t10Raw);
+
+    const cards = [
+      {label:'CPI (YoY inflation)', val: cpiYoy.length?cpiYoy[0].yoy.toFixed(2)+'%':'—', sub: cpiYoy.length?'as of '+cpiYoy[0].date:'', est: cpiEstimate!=null?cpiEstimate.toFixed(2)+'%':null},
+      {label:'Unemployment rate', val: unSeries.length?unSeries[0].value.toFixed(1)+'%':'—', sub: unSeries.length?'as of '+unSeries[0].date:'', est: unEstimate!=null?unEstimate.toFixed(1)+'%':null},
+      {label:'Fed Funds Rate (effective)', val: ffrSeries.length?ffrSeries[0].value.toFixed(2)+'%':'—', sub: ffrSeries.length?'as of '+ffrSeries[0].date:''},
+      {label:'10Y Treasury yield', val: t10Series.length?t10Series[0].value.toFixed(2)+'%':'—', sub: t10Series.length?'as of '+t10Series[0].date+' — market-priced, not an estimate':''}
+    ];
+
+    host.innerHTML = `
+      <div class="radargrid">${cards.map(c=>`
+        <div class="radarcard">
+          <small>${c.label}</small><b>${c.val}</b>
+          <div style="font-size:10.5px;color:var(--muted);margin-top:3px">${c.sub}</div>
+          ${c.est?`<span class="tag estimate">next print ~${c.est}</span>`:''}
+        </div>`).join('')}
+      </div>
+      <div class="macronote">"Next print" tags are this desk's own naive trend extrapolation — the average of the last 3 month-over-month moves, carried forward one step. <b>They are not an economist survey consensus</b> (that number is a paid product — see the Exchanges and Manual sections). Actual releases can and do break trend; treat this as a baseline, not a forecast.</div>
+    `;
+    st.innerHTML = `<span class="ld ok"></span>Updated ${new Date().toLocaleTimeString()}`;
+  }catch(e){
+    st.innerHTML = `<span class="ld err"></span>${e.message}`;
+    host.innerHTML = `<div class="macronote">Fetch failed: ${e.message}</div>`;
+  }
+}
+
+function initMacroPanel(){
+  const keyInput = document.getElementById('key-macro');
+  if(!keyInput) return;
+  keyInput.value = getKeys().macro || '';
+  document.getElementById('savekey-macro').addEventListener('click', ()=>{
+    setKey('macro', keyInput.value.trim());
+    document.getElementById('macroStatus').innerHTML = `<span class="ld ${keyInput.value.trim()?'ok':''}"></span>${keyInput.value.trim()?'Key saved':'Idle — no key saved'}`;
+  });
+  document.getElementById('macroFetch').addEventListener('click', refreshMacro);
+  renderMacroStub(document.getElementById('macroHost'));
 }
 
 /* --- Crypto: live option chain via Deribit public API (free, no key) --- */
@@ -1542,7 +1679,7 @@ function renderVerdictContent(){
 document.getElementById('vbRefresh').addEventListener('click', refreshSignals);
 
 /* ---------- Version check / update button ---------- */
-const CURRENT_VERSION = "1.6";
+const CURRENT_VERSION = "1.7";
 let updateAvailable = null; // set to remote version string when a newer one is seen
 
 async function doRefreshData(){
@@ -1619,6 +1756,7 @@ renderWatchlist();
 renderPredictionRadar();
 renderAcademyStrategies();
 initManualProtection();
+initMacroPanel();
 </script>
 </body>
 </html>
