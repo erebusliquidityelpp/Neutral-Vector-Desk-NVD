@@ -340,7 +340,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
       <a href="#apikeys">API Keys</a>
       <a href="#account">Account</a>
     </nav>
-    <span class="chip verchip" id="verChip">v2.6</span>
+    <span class="chip verchip" id="verChip">v2.7</span>
     <span class="chip" id="welcomeChip" style="display:none"></span>
     <button class="btn sm" id="globalRefresh">⟳ Refresh</button>
     <span class="chip"><span class="dot"></span> Client-side · no stored data</span>
@@ -469,9 +469,11 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
       <div class="vb-head">
         <b>Market Signal Verdicts</b>
         <select id="vbCcy"><option value="BTC">BTC</option><option value="ETH">ETH</option><option value="SOL">SOL</option><option value="XRP">XRP</option></select>
+        <span id="vbStockLabel" style="display:none;color:var(--muted);font:600 12px var(--mono)"></span>
         <button class="btn primary" id="vbRefresh">Refresh signals</button>
         <span class="lp-status" id="vbStatus"><span class="ld"></span>Not loaded</span>
       </div>
+      <p class="note" id="vbUnavailNote" style="display:none"></p>
       <div class="vb-body">
         <div class="vmenu" id="vmenu"></div>
         <div class="vcontent gated" id="vcontent"></div>
@@ -1236,7 +1238,7 @@ function renderTabs(){
       <span class="ld ${ldClass(a)}"></span>${a.label}
     </button>`).join('');
   host.querySelectorAll('.atab').forEach(b=>b.addEventListener('click',()=>{
-    activeAsset = b.dataset.a; renderTabs(); renderLivePanel();
+    activeAsset = b.dataset.a; renderTabs(); renderLivePanel(); updateVerdictHead();
   }));
 }
 
@@ -1306,18 +1308,28 @@ async function fetchForexSpot(){
   const st = document.getElementById('fxStatus');
   const [base,quote] = document.getElementById('fxPair').value.split('/');
   st.innerHTML = `<span class="ld"></span>Loading…`;
-  try{
-    const res = await fetch(`https://api.frankfurter.app/latest?from=${base}&to=${quote}`);
-    if(!res.ok) throw new Error('bad response');
-    const data = await res.json();
-    const rate = data.rates[quote];
-    document.getElementById('spot').value = rate;
-    document.getElementById('multiplier').value = 100000; // standard retail FX lot
-    compute();
-    st.innerHTML = `<span class="ld ok"></span>${base}/${quote} = ${rate} (as of ${data.date})`;
-  }catch(e){
-    st.innerHTML = `<span class="ld err"></span>Fetch failed — network blocked or rate unavailable`;
+  // Frankfurter's canonical host moved to frankfurter.dev (v1); the older .app host still
+  // works for most people via redirect, but try the current host first and fall back.
+  const urls = [
+    `https://api.frankfurter.dev/v1/latest?base=${base}&symbols=${quote}`,
+    `https://api.frankfurter.app/latest?from=${base}&to=${quote}`
+  ];
+  let lastErr = null;
+  for(const url of urls){
+    try{
+      const res = await fetch(url);
+      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const rate = data.rates[quote];
+      if(rate==null) throw new Error(`No rate returned for ${quote}`);
+      document.getElementById('spot').value = rate;
+      document.getElementById('multiplier').value = 100000; // standard retail FX lot
+      compute();
+      st.innerHTML = `<span class="ld ok"></span>${base}/${quote} = ${rate} (as of ${data.date})`;
+      return;
+    }catch(e){ lastErr = e; }
   }
+  st.innerHTML = `<span class="ld err"></span>Fetch failed — ${lastErr ? lastErr.message : 'both Frankfurter hosts unreachable'}`;
 }
 
 /* --- Macro Fundamentals: live CPI/Unemployment/Fed Funds/10Y via Alpha Vantage (free key) --- */
@@ -1773,45 +1785,47 @@ async function loadStockLegs(){
   const key = getKeys()[provider];
   st.innerHTML = `<span class="ld"></span>Fetching chain…`;
   try{
-    let strikesArr, premiumFor, spot;
+    let list, strikesArr, premiumFor, spot;
     if(provider==='tradier'){
       const [quoteData, chainData] = await Promise.all([
         apiFetch(`/proxy/tradier/v1/markets/quotes?symbols=${symbol}`, {headers:{'x-provider-key':key}}),
-        apiFetch(`/proxy/tradier/v1/markets/options/chains?symbol=${symbol}&expiration=${expiry}&greeks=false`, {headers:{'x-provider-key':key}})
+        apiFetch(`/proxy/tradier/v1/markets/options/chains?symbol=${symbol}&expiration=${expiry}&greeks=true`, {headers:{'x-provider-key':key}})
       ]);
       const q = quoteData.quotes && quoteData.quotes.quote;
       spot = Array.isArray(q) ? q[0].last : (q ? q.last : null);
       const opts = (chainData.options && chainData.options.option) || [];
-      const list = Array.isArray(opts) ? opts : [opts];
-      strikesArr = [...new Set(list.map(o=>o.strike))].sort((a,b)=>a-b);
-      premiumFor = (strike,type)=>{
-        const o = list.find(x=>x.strike===strike && x.option_type===type);
-        if(!o) return null;
-        if(o.bid>0 && o.ask>0) return (o.bid+o.ask)/2;
-        return o.last || null;
-      };
+      const raw = Array.isArray(opts) ? opts : [opts];
+      list = raw.map(o=>({
+        strike: o.strike, option_type: o.option_type,
+        bid: o.bid, ask: o.ask, last: o.last,
+        oi: o.open_interest || 0,
+        iv: (o.greeks && o.greeks.mid_iv!=null) ? o.greeks.mid_iv : null
+      }));
     } else {
       const [aggData, chainData] = await Promise.all([
         apiFetch(`/proxy/polygon/v2/aggs/ticker/${symbol}/prev`, {headers:{'x-provider-key':key}}),
         apiFetch(`/proxy/polygon/v3/snapshot/options/${symbol}?expiration_date=${expiry}&limit=250`, {headers:{'x-provider-key':key}})
       ]);
       spot = aggData.results && aggData.results[0] ? aggData.results[0].c : null;
-      const list = (chainData.results||[]).map(r=>({
+      list = (chainData.results||[]).map(r=>({
         strike: r.details.strike_price,
         option_type: r.details.contract_type,
         bid: r.last_quote ? r.last_quote.bid : null,
         ask: r.last_quote ? r.last_quote.ask : null,
-        last: r.day ? r.day.close : null
+        last: r.day ? r.day.close : null,
+        oi: r.open_interest || 0,
+        iv: r.implied_volatility!=null ? r.implied_volatility : null
       }));
-      strikesArr = [...new Set(list.map(o=>o.strike))].sort((a,b)=>a-b);
-      premiumFor = (strike,type)=>{
-        const o = list.find(x=>x.strike===strike && x.option_type===type);
-        if(!o) return null;
-        if(o.bid>0 && o.ask>0) return (o.bid+o.ask)/2;
-        return o.last || null;
-      };
     }
+    strikesArr = [...new Set(list.map(o=>o.strike))].sort((a,b)=>a-b);
+    premiumFor = (strike,type)=>{
+      const o = list.find(x=>x.strike===strike && x.option_type===type);
+      if(!o) return null;
+      if(o.bid>0 && o.ask>0) return (o.bid+o.ask)/2;
+      return o.last || null;
+    };
     if(!spot || !strikesArr.length){ st.innerHTML = `<span class="ld err"></span>No usable chain data returned for that expiry`; return; }
+    stockCache[symbol].lastChain = {list, spot, expiry};
 
     const atm = nearest(strikesArr, spot);
     const idx = strikesArr.indexOf(atm);
@@ -1836,8 +1850,98 @@ async function loadStockLegs(){
     if(!withPrem.length){ st.innerHTML = `<span class="ld err"></span>Could not match live premiums for this expiry`; return; }
     applyStockLegsToForm(withPrem, spot);
     st.innerHTML = `<span class="ld ok"></span>Loaded live ${symbol} ${current.name} @ ${expiry} — spot ${spot.toFixed(2)}`;
+    updateVerdictHead();
   }catch(e){
     st.innerHTML = `<span class="ld err"></span>${e.message}`;
+  }
+}
+
+async function fetchStockRealizedVol(symbol, provider, key){
+  try{
+    const end = new Date(), start = new Date(end.getTime()-45*86400000);
+    const fmt = d=>d.toISOString().slice(0,10);
+    let closes;
+    if(provider==='tradier'){
+      const data = await apiFetch(`/proxy/tradier/v1/markets/history?symbol=${symbol}&interval=daily&start=${fmt(start)}&end=${fmt(end)}`, {headers:{'x-provider-key':key}});
+      const days = data.history && data.history.day;
+      const list = Array.isArray(days) ? days : (days ? [days] : []);
+      closes = list.map(d=>d.close);
+    } else {
+      const data = await apiFetch(`/proxy/polygon/v2/aggs/ticker/${symbol}/range/1/day/${fmt(start)}/${fmt(end)}?adjusted=true&sort=asc&limit=60`, {headers:{'x-provider-key':key}});
+      closes = (data.results||[]).map(r=>r.c);
+    }
+    if(!closes || closes.length<6) return null;
+    const rets = [];
+    for(let i=1;i<closes.length;i++) rets.push(Math.log(closes[i]/closes[i-1]));
+    const mean = rets.reduce((a,b)=>a+b,0)/rets.length;
+    const variance = rets.reduce((a,b)=>a+(b-mean)*(b-mean),0)/(rets.length-1);
+    return Math.sqrt(variance)*Math.sqrt(252)*100;
+  }catch(e){ return null; }
+}
+
+async function refreshStockSignals(){
+  const st = document.getElementById('vbStatus');
+  const symbol = lastStockSymbol;
+  const cache = symbol ? stockCache[symbol] : null;
+  if(!symbol || !cache || !cache.lastChain){
+    st.innerHTML = `<span class="ld err"></span>Load live strikes in the Stocks tab above first`;
+    return;
+  }
+  st.innerHTML = `<span class="ld"></span>Loading…`;
+  try{
+    const {provider, lastChain} = cache;
+    const key = getKeys()[provider];
+    const {list, spot} = lastChain;
+    const strikesArr = [...new Set(list.map(o=>o.strike))];
+    const atm = nearest(strikesArr, spot);
+    const atmCall = list.find(o=>o.strike===atm && o.option_type==='call');
+    const markIv = (atmCall && atmCall.iv!=null) ? atmCall.iv*100 : null;
+
+    const calls = list.filter(o=>o.option_type==='call' && o.oi>0 && o.iv!=null);
+    const puts = list.filter(o=>o.option_type==='put' && o.oi>0 && o.iv!=null);
+    const callOI = calls.reduce((s,o)=>s+o.oi,0);
+    const putOI = puts.reduce((s,o)=>s+o.oi,0);
+    const avgCallIv = calls.length ? calls.reduce((s,o)=>s+o.iv,0)/calls.length*100 : null;
+    const avgPutIv = puts.length ? puts.reduce((s,o)=>s+o.iv,0)/puts.length*100 : null;
+    const pcr = callOI>0 ? putOI/callOI : null;
+    const skew = (avgPutIv!=null && avgCallIv!=null) ? avgPutIv-avgCallIv : null;
+    const totalOI = (callOI+putOI) || null;
+
+    const realizedVol = await fetchStockRealizedVol(symbol, provider, key);
+
+    signals = {ccy:symbol, markIv, spot, realizedVol, funding8h:null, fng:null, fngLabel:null,
+      btcDom:null, totalMcap:null, pcr, skew, totalOI, mempoolFee:null, mempoolCount:null, ts:Date.now()};
+    st.innerHTML = `<span class="ld ok"></span>Updated ${new Date().toLocaleTimeString()}`;
+  }catch(e){
+    st.innerHTML = `<span class="ld err"></span>Signal fetch failed (${e.message})`;
+  }
+  renderVerdictMenu(); renderVerdictContent(); renderWatchlist(); renderPredictionRadar();
+}
+
+function updateVerdictHead(){
+  const ccySel = document.getElementById('vbCcy');
+  const stkLabel = document.getElementById('vbStockLabel');
+  const refreshBtn = document.getElementById('vbRefresh');
+  const unavail = document.getElementById('vbUnavailNote');
+  if(!ccySel || !stkLabel || !refreshBtn || !unavail) return;
+  if(activeAsset==='crypto'){
+    ccySel.style.display=''; stkLabel.style.display='none'; unavail.style.display='none';
+    refreshBtn.disabled=false; refreshBtn.textContent='Refresh signals';
+  } else if(activeAsset==='stocks'){
+    ccySel.style.display='none'; unavail.style.display='none';
+    stkLabel.style.display='';
+    stkLabel.textContent = lastStockSymbol ? `Symbol: ${lastStockSymbol}` : 'Load live strikes in the Stocks tab above first';
+    refreshBtn.style.display=''; refreshBtn.disabled = !(lastStockSymbol && stockCache[lastStockSymbol] && stockCache[lastStockSymbol].lastChain);
+    refreshBtn.textContent='Refresh signals';
+  } else {
+    ccySel.style.display='none'; stkLabel.style.display='none';
+    refreshBtn.disabled=true; refreshBtn.style.display='none';
+    unavail.style.display='';
+    unavail.textContent = activeAsset==='forex'
+      ? 'FX options have no free public feed, so there\'s no implied-vol/OI data to build a GO/CAUTION/AVOID verdict from here — set an FX options provider key in API Keys if you ever get one.'
+      : 'Treasury/bond options settle through licensed market-data vendors with no free feed, so there\'s no live data to build a verdict from here.';
+    signals = null;
+    renderVerdictMenu(); renderVerdictContent(); renderPredictionRadar();
   }
 }
 
@@ -1939,6 +2043,8 @@ async function fetchMempool(){
 }
 
 async function refreshSignals(){
+  if(activeAsset==='stocks') return refreshStockSignals();
+  if(activeAsset!=='crypto') return;
   const ccy = document.getElementById('vbCcy').value;
   const st = document.getElementById('vbStatus');
   st.innerHTML = `<span class="ld"></span>Loading…`;
@@ -1965,7 +2071,7 @@ function verdictFor(id, s){
   const ivPrem = s.markIv - s.realizedVol;
   const fundingPct = (s.funding8h||0)*100;
   const fundingExtreme = Math.abs(fundingPct) > 0.05;
-  const fngExtreme = s.fng<=20 || s.fng>=80;
+  const fngExtreme = s.fng!=null && (s.fng<=20 || s.fng>=80);
   const crowded = s.pcr!=null && (s.pcr>1.3 || s.pcr<0.6);
 
   if(id==='straddle' || id==='strangle'){
@@ -2128,7 +2234,7 @@ function renderPredictionRadar(){
   const ivPrem = haveVol ? (s.markIv - s.realizedVol) : null;
   const fundingPct = (s.funding8h||0)*100;
   const fundingExtreme = Math.abs(fundingPct) > 0.05;
-  const fngExtreme = s.fng<=20 || s.fng>=80;
+  const fngExtreme = s.fng!=null && (s.fng<=20 || s.fng>=80);
   const crowded = s.pcr!=null && (s.pcr>1.3 || s.pcr<0.6);
   const volTag = !haveVol ? 'unknown' : (ivPrem < -3 ? 'cheap' : (ivPrem > 3 ? 'rich' : 'fair'));
 
@@ -2137,14 +2243,18 @@ function renderPredictionRadar(){
     {label:'Implied vol (ATM)', val:fmtNum(s.markIv,1)+'%'},
     {label:'Realized vol', val:fmtNum(s.realizedVol,1)+'%'},
     {label:'IV − RV spread', val:haveVol?((ivPrem>=0?'+':'')+ivPrem.toFixed(1)+' pts'):'not available', tag:volTag},
-    {label:'Funding (8h)', val:fundingPct.toFixed(3)+'%', tag:fundingExtreme?'stretched':'calm'},
-    {label:'Fear & Greed', val:`${s.fng} (${s.fngLabel})`, tag:fngExtreme?'extreme':'calm'},
-    {label:'BTC dominance', val:fmtNum(s.btcDom,1)+'%'},
-    {label:'Total crypto mcap', val:'$'+(s.totalMcap/1e9).toFixed(0)+'B'},
     {label:'Put/Call OI ratio', val:s.pcr!=null?s.pcr.toFixed(2):'—', tag:crowded?'lopsided':'calm'},
     {label:'Put − Call IV skew', val:s.skew!=null?(s.skew>=0?'+':'')+s.skew.toFixed(1)+' pts':'—'},
     {label:'Total option OI', val:s.totalOI!=null?s.totalOI.toLocaleString():'—'}
   ];
+  if(s.funding8h!=null){
+    cards.splice(4,0,{label:'Funding (8h)', val:fundingPct.toFixed(3)+'%', tag:fundingExtreme?'stretched':'calm'});
+  }
+  if(s.fng!=null){
+    cards.splice(5,0,{label:'Fear & Greed', val:`${s.fng} (${s.fngLabel})`, tag:fngExtreme?'extreme':'calm'});
+  }
+  if(s.btcDom!=null) cards.push({label:'BTC dominance', val:fmtNum(s.btcDom,1)+'%'});
+  if(s.totalMcap!=null) cards.push({label:'Total crypto mcap', val:'$'+(s.totalMcap/1e9).toFixed(0)+'B'});
   if(s.ccy==='BTC' && s.mempoolFee!=null){
     cards.push({label:'Mempool fastest fee', val:s.mempoolFee+' sat/vB'});
     cards.push({label:'Mempool backlog', val:s.mempoolCount!=null?s.mempoolCount.toLocaleString()+' txs':'—'});
@@ -2153,8 +2263,8 @@ function renderPredictionRadar(){
   let verdictCls, verdictLabel, bits=[];
   if(!haveVol){
     verdictCls='caution'; verdictLabel='DATA INCOMPLETE';
-    bits.push(`Deribit isn't publishing ATM implied vol and/or realized vol for ${s.ccy} right now — this asset may have too thin an options book, or the historical-volatility endpoint may not cover it.`);
-    bits.push('Every verdict that depends on the IV-vs-realized spread is withheld for this asset rather than guessed. Switch to BTC or ETH for the full signal set, or use the raw cards above for whatever did come back.');
+    bits.push(`ATM implied vol and/or realized vol for ${s.ccy} isn't available right now — the options book may be too thin, the symbol may not have published greeks, or the history lookup came back short.`);
+    bits.push('Every verdict that depends on the IV-vs-realized spread is withheld rather than guessed. Use the raw cards above for whatever did come back.');
   } else if(crowded && volTag==='rich'){
     verdictCls='avoid'; verdictLabel='CROWDED — FAVOR LONG VOL';
     bits.push(`Put/Call OI ratio is lopsided at ${s.pcr.toFixed(2)} — positioning is crowded enough that a squeeze risk outweighs the rich premium.`);
@@ -2340,7 +2450,7 @@ function renderVerdictContent(){
 document.getElementById('vbRefresh').addEventListener('click', refreshSignals);
 
 /* ---------- Version check / update button ---------- */
-const CURRENT_VERSION = "2.6";
+const CURRENT_VERSION = "2.7";
 let updateAvailable = null; // set to remote version string when a newer one is seen
 
 async function doRefreshData(){
@@ -2856,6 +2966,7 @@ renderInputs();
 compute();
 renderTabs();
 renderLivePanel();
+updateVerdictHead();
 renderVerdictMenu();
 renderVerdictContent();
 renderWatchlist();
