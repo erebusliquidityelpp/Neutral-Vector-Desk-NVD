@@ -295,8 +295,9 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
       <a href="#journal">Journal</a>
       <a href="#academy">Vocabulary &amp; Academy</a>
       <a href="#manual">Manual</a>
+      <a href="#account">Account</a>
     </nav>
-    <span class="chip verchip" id="verChip">v1.9</span>
+    <span class="chip verchip" id="verChip">v2.0</span>
     <button class="btn sm" id="globalRefresh">⟳ Refresh</button>
     <span class="chip"><span class="dot"></span> Client-side · no stored data</span>
   </div>
@@ -312,7 +313,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
       <a class="btn" href="#strategies">Browse strategies</a>
     </div>
     <div class="stats">
-      <div class="stat"><small>Structures covered</small><b>5</b></div>
+      <div class="stat"><small>Structures covered</small><b id="structCount">17</b></div>
       <div class="stat"><small>Directional bias required</small><b>None</b></div>
       <div class="stat"><small>Data source</small><b>Your inputs</b></div>
     </div>
@@ -323,7 +324,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
   <div class="wrap">
     <div class="shead">
       <div class="kicker">Strategy library</div>
-      <h3 class="stitle">Five structures, five different relationships to volatility</h3>
+      <h3 class="stitle">17 structures, 17 different relationships to volatility</h3>
       <p class="sdesc">"Non-directional" doesn't mean risk-free — it means the P&L depends on how far and how fast price moves, or how long it stays still, rather than which way it goes. Click a card to load it into the builder below.</p>
     </div>
     <div class="sgrid" id="sgrid"></div>
@@ -714,6 +715,56 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
         <p>This desk is a calculator and a signal reader, not a trading system and not investment advice. It has no knowledge of your account size, your open positions, or your risk tolerance. Every verdict is a reading of a handful of public market signals against a fixed set of rules — it is not a guarantee, and every structure shown here can lose money even on a GO verdict. Treat every number as a starting point for your own judgment, not a substitute for it.</p>
       </div>
       <div class="mdfoot">This manual exists only as this page. No .pdf, .docx, or other file version is generated, stored, or linked anywhere on this site.</div>
+    </div>
+  </div>
+</section>
+
+<section id="account">
+  <div class="wrap">
+    <div class="shead">
+      <div class="kicker">Account</div>
+      <h3 class="stitle">Backend — sync across devices, and real order execution</h3>
+      <p class="sdesc">Everything above still works with no account at all (Journal/Watchlist stay in this browser's local storage). Signing in adds: Journal/Watchlist synced across devices, an encrypted vault for exchange API keys, and a real "Execute" option on the Trade Ticket. The backend never sees your exchange secret in plaintext — it's encrypted before it's stored.</p>
+    </div>
+
+    <div class="livepanel">
+      <div class="lp-head"><b>Backend connection</b><span class="lp-status" id="acctConnStatus"><span class="ld"></span>Not configured</span></div>
+      <div class="lp-row">
+        <div class="field" style="flex:1"><label>Backend URL (from your Railway deploy)</label><input type="text" id="apiBaseInput" placeholder="https://your-service.up.railway.app"></div>
+        <button class="btn" id="apiBaseSave">Save</button>
+      </div>
+      <div class="note">This is the backend's own URL, not this site's — you get it from Railway after deploying the <code>backend/</code> folder as its own service. Nothing here works until this is set.</div>
+    </div>
+
+    <div class="livepanel" id="authPanel">
+      <div class="lp-head"><b>Sign in</b><span class="lp-status" id="authStatus"><span class="ld"></span>Signed out</span></div>
+      <div id="authHost"></div>
+    </div>
+
+    <div class="livepanel" id="keysPanel" style="display:none">
+      <div class="lp-head"><b>Exchange API keys</b><span class="lp-status"></span></div>
+      <div class="note">Stored encrypted (AES-256-GCM) on your own backend — never in this browser, never in plaintext. For Hyperliquid, "API key" = wallet address and "API secret" = that wallet's private key; consider a dedicated sub-wallet funded only with what you're willing to risk through this site. Test with "Testnet" checked where the exchange supports it before using a live key.</div>
+      <div id="keysHost"></div>
+      <div class="lp-row" style="margin-top:10px;flex-wrap:wrap">
+        <div class="field"><label>Exchange</label>
+          <select id="keyExchange">
+            <option value="hyperliquid">Hyperliquid</option>
+            <option value="binance">Binance</option>
+            <option value="bybit">Bybit</option>
+            <option value="okx">OKX</option>
+            <option value="deribit">Deribit</option>
+            <option value="coinbase">Coinbase</option>
+          </select>
+        </div>
+        <div class="field"><label>Label (optional)</label><input type="text" id="keyLabel" placeholder="Main account"></div>
+        <div class="field"><label>Testnet</label><input type="checkbox" id="keyTestnet"></div>
+      </div>
+      <div class="lp-row" style="flex-wrap:wrap">
+        <div class="field" style="flex:1"><label id="keyApiKeyLabel">API key / wallet address</label><input type="text" id="keyApiKey"></div>
+        <div class="field" style="flex:1"><label id="keyApiSecretLabel">API secret / private key</label><input type="password" id="keyApiSecret"></div>
+        <div class="field" style="flex:1"><label>Passphrase (OKX/Coinbase only)</label><input type="password" id="keyPassphrase"></div>
+      </div>
+      <div class="lp-row"><button class="btn primary" id="keySave">Save credentials</button></div>
     </div>
   </div>
 </section>
@@ -1666,9 +1717,14 @@ function getWatchlist(){
 function isWatched(id){ return getWatchlist().includes(id); }
 function toggleWatch(id){
   let wl = getWatchlist();
-  wl = wl.includes(id) ? wl.filter(x=>x!==id) : [...wl, id];
+  const nowWatched = !wl.includes(id);
+  wl = nowWatched ? [...wl, id] : wl.filter(x=>x!==id);
   localStorage.setItem('nvd_watchlist', JSON.stringify(wl));
   renderVerdictMenu(); renderWatchlist();
+  if(authToken && apiBase){
+    const path = `/api/watchlist/${id}`;
+    apiFetch(path, {method: nowWatched?'POST':'DELETE'}).catch(()=>{});
+  }
 }
 
 function renderVerdictMenu(){
@@ -1931,7 +1987,7 @@ function renderVerdictContent(){
 document.getElementById('vbRefresh').addEventListener('click', refreshSignals);
 
 /* ---------- Version check / update button ---------- */
-const CURRENT_VERSION = "1.9";
+const CURRENT_VERSION = "2.0";
 let updateAvailable = null; // set to remote version string when a newer one is seen
 
 async function doRefreshData(){
@@ -2016,7 +2072,8 @@ Built: ${new Date(lc.ts).toLocaleString()}`;
         <button class="btn" id="copyTicket">Copy ticket text</button>
         <a class="btn primary" href="${exLink}" target="_blank" rel="noopener">Open ${ccy||'exchange'} options on Deribit ↗</a>
       </div>
-      <div class="macronote"><b>This site never asks for or stores a secret / trade-enabled API key.</b> It's a static, client-side-only page with no backend server — any secret key typed in here would travel through your browser and could be read via devtools or network traffic, so there is no safe way for a site like this to hold one. Use this ticket to place the order yourself on the exchange, where your key stays with the exchange's own authenticated session.</div>
+      <div class="macronote">${authToken && myKeys.length ? '<b>Real execution is available below</b> — your keys are encrypted on your own backend, never in this browser.' : 'This site itself never asks for or stores a secret / trade-enabled API key — that only ever happens through your own backend (see Account below), and even there it\'s encrypted at rest.'} Without that, use this ticket to place the order yourself on the exchange.</div>
+      <div id="executeHost"></div>
     </div>`;
   document.getElementById('ticketText').textContent = text;
   document.getElementById('copyTicket').onclick = async ()=>{
@@ -2027,6 +2084,54 @@ Built: ${new Date(lc.ts).toLocaleString()}`;
       setTimeout(()=>{ btn.textContent = orig; }, 1600);
     }catch(e){ alert('Could not copy automatically — select the text above and copy manually.'); }
   };
+  renderExecutePanel(lc);
+}
+
+// Real execution — only ever reachable when signed in with at least one exchange key on file.
+// Options symbols aren't auto-derived here (this desk doesn't track each exchange's exact
+// listed-instrument naming per strike/expiry), so each leg's exchange symbol is a field you
+// fill in yourself; everything else (side/type/amount/price) is prefilled from the structure.
+function renderExecutePanel(lc){
+  const host = document.getElementById('executeHost');
+  if(!authToken || !apiBase){ host.innerHTML = ''; return; }
+  if(!myKeys.length){ host.innerHTML = `<div class="note">No exchange keys on file yet — add one under Account below to enable real execution here.</div>`; return; }
+  const exOptions = myKeys.map(k=>`<option value="${k.exchange}" data-testnet="${k.testnet}">${k.exchange}${k.testnet?' (testnet)':''}${k.label?' — '+k.label:''}</option>`).join('');
+  host.innerHTML = `
+    <div class="ticketbox" style="margin-top:10px">
+      <b>Execute — places a REAL order on the exchange you select</b>
+      <div class="lp-row"><div class="field"><label>Exchange (from your saved keys)</label><select id="execExchange">${exOptions}</select></div></div>
+      ${lc.legs.map((l,i)=>`
+        <div class="lp-row" style="flex-wrap:wrap;border-top:1px dashed var(--line);padding-top:8px;margin-top:8px">
+          <div style="width:100%;font-size:12px;color:var(--muted)">Leg ${i+1}: ${l.side.toUpperCase()} ${l.type.toUpperCase()} @ strike ${l.strike}</div>
+          <div class="field" style="flex:2"><label>Exchange symbol (you fill this in, e.g. BTC-27DEC24-70000-C)</label><input type="text" class="execSymbol" data-leg="${i}" placeholder="exact listed instrument/ticker on the exchange"></div>
+          <div class="field"><label>Type</label><select class="execType" data-leg="${i}"><option value="limit">limit</option><option value="market">market</option></select></div>
+          <div class="field"><label>Amount</label><input type="number" class="execAmount" data-leg="${i}" value="${(lc.qty*(l.ratio||1))}" step="any"></div>
+          <div class="field"><label>Price</label><input type="number" class="execPrice" data-leg="${i}" value="${l.premium}" step="any"></div>
+          <div class="field"><button class="btn sm" data-execleg="${i}">Send this leg</button></div>
+        </div>`).join('')}
+      <div class="macronote">Each leg is sent as its own separate order — this is not an atomic combo order, so one leg can fill while another doesn't ("legging risk"). Send and confirm one at a time, especially the first time on a new exchange.</div>
+    </div>`;
+  host.querySelectorAll('[data-execleg]').forEach(btn=>{
+    btn.onclick = async ()=>{
+      const i = btn.dataset.execleg;
+      const exSel = document.getElementById('execExchange');
+      const exchange = exSel.value;
+      const testnet = exSel.selectedOptions[0].dataset.testnet === 'true';
+      const symbol = host.querySelector(`.execSymbol[data-leg="${i}"]`).value.trim();
+      const type = host.querySelector(`.execType[data-leg="${i}"]`).value;
+      const amount = parseFloat(host.querySelector(`.execAmount[data-leg="${i}"]`).value);
+      const price = parseFloat(host.querySelector(`.execPrice[data-leg="${i}"]`).value);
+      const leg = lc.legs[i];
+      if(!symbol){ alert('Enter the exact exchange symbol for this leg first.'); return; }
+      if(!confirm(`Send real order?\n\n${exchange}${testnet?' (testnet)':''}: ${leg.side.toUpperCase()} ${amount} ${symbol} @ ${type==='limit'?price:'market'}\n\nThis places an actual order. Confirm you've checked the symbol and size.`)) return;
+      try{
+        const r = await apiFetch(`/api/execute/${exchange}/order`, {method:'POST', body: JSON.stringify({
+          symbol, side: leg.side==='buy'?'buy':'sell', type, amount, price: type==='limit'?price:undefined, testnet
+        })});
+        alert('Order sent. ' + (r.order && r.order.id ? `Order id: ${r.order.id}` : JSON.stringify(r.order)));
+      }catch(e){ alert('Order failed: ' + e.message); }
+    };
+  });
 }
 
 /* ---------- Advanced Journal (auto-captures builder + live signal state; no manual data entry) ---------- */
@@ -2061,6 +2166,7 @@ function logTrade(){
   arr.unshift(entry);
   setJournal(arr);
   renderJournal();
+  if(authToken && apiBase) apiFetch('/api/journal', {method:'POST', body: JSON.stringify(entry)}).catch(()=>{});
   const el = document.getElementById('journal');
   if(el) el.scrollIntoView({behavior:'smooth', block:'start'});
 }
@@ -2077,11 +2183,13 @@ function closeJournalEntry(id){
   arr[idx].realizedPnl = pnl;
   setJournal(arr);
   renderJournal();
+  if(authToken && apiBase) apiFetch('/api/journal', {method:'POST', body: JSON.stringify(arr[idx])}).catch(()=>{});
 }
 function deleteJournalEntry(id){
   if(!confirm('Delete this journal entry? This cannot be undone.')) return;
   setJournal(getJournal().filter(e=>e.id!==id));
   renderJournal();
+  if(authToken && apiBase) apiFetch(`/api/journal/${id}`, {method:'DELETE'}).catch(()=>{});
 }
 function exportJournalCSV(){
   const arr = getJournal();
@@ -2146,6 +2254,174 @@ function renderJournal(){
   host.querySelectorAll('[data-close]').forEach(b=>b.onclick = ()=>closeJournalEntry(b.dataset.close));
   host.querySelectorAll('[data-del]').forEach(b=>b.onclick = ()=>deleteJournalEntry(b.dataset.del));
 }
+/* ---------- Backend account: API base, auth, encrypted key vault, sync ---------- */
+let apiBase = (()=>{ try{ return localStorage.getItem('nvd_api_base')||''; }catch(e){ return ''; } })();
+let authToken = (()=>{ try{ return localStorage.getItem('nvd_token')||''; }catch(e){ return ''; } })();
+let authUser = (()=>{ try{ return JSON.parse(localStorage.getItem('nvd_user')||'null'); }catch(e){ return null; } })();
+let myKeys = [];
+
+async function apiFetch(path, opts={}){
+  if(!apiBase) throw new Error('Backend URL not set — save it above first.');
+  const headers = Object.assign({'Content-Type':'application/json'}, opts.headers||{});
+  if(authToken) headers['Authorization'] = `Bearer ${authToken}`;
+  const res = await fetch(apiBase.replace(/\/$/,'') + path, Object.assign({}, opts, {headers}));
+  let body = null;
+  try{ body = await res.json(); }catch(e){}
+  if(!res.ok) throw new Error((body&&body.error)||`Request failed (${res.status})`);
+  return body;
+}
+
+function setAuth(token, user){
+  authToken = token; authUser = user;
+  try{
+    if(token) localStorage.setItem('nvd_token', token); else localStorage.removeItem('nvd_token');
+    if(user) localStorage.setItem('nvd_user', JSON.stringify(user)); else localStorage.removeItem('nvd_user');
+  }catch(e){}
+}
+
+function renderAccountConn(){
+  const st = document.getElementById('acctConnStatus');
+  st.innerHTML = apiBase ? `<span class="ld ok"></span>Set: ${apiBase}` : `<span class="ld"></span>Not configured`;
+}
+
+function renderAuthPanel(){
+  const host = document.getElementById('authHost');
+  const st = document.getElementById('authStatus');
+  const keysPanel = document.getElementById('keysPanel');
+  if(authToken && authUser){
+    st.innerHTML = `<span class="ld ok"></span>Signed in as ${authUser.email}`;
+    host.innerHTML = `<div class="lp-row"><button class="btn" id="logoutBtn">Sign out</button></div>`;
+    document.getElementById('logoutBtn').onclick = ()=>{ setAuth(null,null); myKeys=[]; renderAuthPanel(); };
+    keysPanel.style.display = '';
+    loadKeys();
+    syncFromBackend();
+  } else {
+    st.innerHTML = `<span class="ld"></span>Signed out`;
+    keysPanel.style.display = 'none';
+    host.innerHTML = `
+      <div class="lp-row" style="flex-wrap:wrap">
+        <div class="field" style="flex:1"><label>Email</label><input type="email" id="authEmail"></div>
+        <div class="field" style="flex:1"><label>Password</label><input type="password" id="authPassword" placeholder="min 10 characters"></div>
+      </div>
+      <div class="lp-row">
+        <button class="btn primary" id="authLoginBtn">Sign in</button>
+        <button class="btn" id="authRegisterBtn">Create account</button>
+      </div>
+      <div class="macronote" id="authMsg" style="display:none"></div>`;
+    const msg = (text, isErr)=>{ const m=document.getElementById('authMsg'); m.style.display=''; m.textContent=text; m.style.color = isErr?'var(--down)':'var(--up)'; };
+    document.getElementById('authLoginBtn').onclick = async ()=>{
+      try{
+        const email = document.getElementById('authEmail').value.trim();
+        const password = document.getElementById('authPassword').value;
+        const r = await apiFetch('/auth/login', {method:'POST', body: JSON.stringify({email, password})});
+        setAuth(r.token, r.user); renderAuthPanel();
+      }catch(e){ msg(e.message, true); }
+    };
+    document.getElementById('authRegisterBtn').onclick = async ()=>{
+      try{
+        const email = document.getElementById('authEmail').value.trim();
+        const password = document.getElementById('authPassword').value;
+        const r = await apiFetch('/auth/register', {method:'POST', body: JSON.stringify({email, password})});
+        setAuth(r.token, r.user); renderAuthPanel();
+      }catch(e){ msg(e.message, true); }
+    };
+  }
+}
+
+function keyFieldLabelsFor(exchange){
+  if(exchange==='hyperliquid') return ['Wallet address','Wallet private key'];
+  return ['API key','API secret'];
+}
+
+async function loadKeys(){
+  try{
+    const r = await apiFetch('/api/keys');
+    myKeys = r.keys;
+    renderKeys();
+  }catch(e){ /* not fatal — account section still usable */ }
+}
+
+function renderKeys(){
+  const host = document.getElementById('keysHost');
+  if(!myKeys.length){ host.innerHTML = `<div class="note">No exchange credentials saved yet.</div>`; return; }
+  host.innerHTML = `<table class="jtbl"><thead><tr><th>Exchange</th><th>Label</th><th>Testnet</th><th>Added</th><th></th></tr></thead><tbody>
+    ${myKeys.map(k=>`<tr>
+      <td>${k.exchange}</td><td>${k.label||'—'}</td><td>${k.testnet?'Yes':'No'}</td>
+      <td>${new Date(k.created_at).toLocaleDateString()}</td>
+      <td><button class="btn sm" data-rmkey="${k.id}">Remove</button></td>
+    </tr>`).join('')}
+  </tbody></table>`;
+  host.querySelectorAll('[data-rmkey]').forEach(b=>b.onclick=async()=>{
+    if(!confirm('Remove this exchange\'s saved credentials?')) return;
+    try{ await apiFetch(`/api/keys/${b.dataset.rmkey}`, {method:'DELETE'}); await loadKeys(); }
+    catch(e){ alert(e.message); }
+  });
+}
+
+function initAccountPanel(){
+  document.getElementById('apiBaseInput').value = apiBase;
+  renderAccountConn();
+  document.getElementById('apiBaseSave').onclick = ()=>{
+    apiBase = document.getElementById('apiBaseInput').value.trim().replace(/\/$/,'');
+    try{ localStorage.setItem('nvd_api_base', apiBase); }catch(e){}
+    renderAccountConn();
+  };
+  renderAuthPanel();
+
+  const exSel = document.getElementById('keyExchange');
+  const syncLabels = ()=>{
+    const [a,b] = keyFieldLabelsFor(exSel.value);
+    document.getElementById('keyApiKeyLabel').textContent = a;
+    document.getElementById('keyApiSecretLabel').textContent = b;
+  };
+  exSel.onchange = syncLabels; syncLabels();
+
+  document.getElementById('keySave').onclick = async ()=>{
+    try{
+      const payload = {
+        exchange: exSel.value,
+        label: document.getElementById('keyLabel').value.trim() || null,
+        testnet: document.getElementById('keyTestnet').checked,
+        apiKey: document.getElementById('keyApiKey').value.trim(),
+        apiSecret: document.getElementById('keyApiSecret').value.trim(),
+        passphrase: document.getElementById('keyPassphrase').value.trim() || null
+      };
+      await apiFetch('/api/keys', {method:'POST', body: JSON.stringify(payload)});
+      document.getElementById('keyApiKey').value = '';
+      document.getElementById('keyApiSecret').value = '';
+      document.getElementById('keyPassphrase').value = '';
+      await loadKeys();
+    }catch(e){ alert(e.message); }
+  };
+}
+
+// Pulls the backend's Journal/Watchlist down and merges them into the local view once, right
+// after sign-in. Backend is treated as the source of truth for anything already logged in
+// from another device; anything still only local (e.g. from before this device ever signed in)
+// gets pushed up so it isn't lost.
+async function syncFromBackend(){
+  try{
+    const [jr, wr] = await Promise.all([apiFetch('/api/journal'), apiFetch('/api/watchlist')]);
+    const remoteIds = new Set(jr.entries.map(e=>e.id));
+    const localOnly = getJournal().filter(e=>!remoteIds.has(e.id));
+    for(const e of localOnly){ try{ await apiFetch('/api/journal', {method:'POST', body: JSON.stringify(e)}); }catch(err){} }
+    const merged = jr.entries.map(e=>({
+      id:e.id, openedAt:Number(e.opened_at), status:e.status, stratId:e.strat_id, stratName:e.strat_name,
+      asset:e.asset, ccy:e.ccy, spot:e.spot, qty:e.qty, mult:e.mult, legs:e.legs,
+      maxProfit:e.max_profit, maxLoss:e.max_loss, breakevens:e.breakevens, netIsDebit:e.net_is_debit,
+      netAmount:e.net_amount, signalSnapshot:e.signal_snapshot, closedAt:e.closed_at?Number(e.closed_at):null,
+      exitSpot:e.exit_spot, realizedPnl:e.realized_pnl
+    })).concat(localOnly);
+    setJournal(merged);
+
+    const wl = new Set([...(wr.stratIds||[]), ...getWatchlist()]);
+    for(const id of wl){ if(!(wr.stratIds||[]).includes(id)){ try{ await apiFetch(`/api/watchlist/${id}`, {method:'POST'}); }catch(err){} } }
+    localStorage.setItem('nvd_watchlist', JSON.stringify([...wl]));
+
+    renderJournal(); renderWatchlist(); renderVerdictMenu();
+  }catch(e){ /* sync is best-effort — local data still works on its own */ }
+}
+
 function initTicketAndJournal(){
   document.getElementById('buildTicket').onclick = buildTradeTicket;
   document.getElementById('logTrade').onclick = logTrade;
@@ -2174,6 +2450,7 @@ function initTicketAndJournal(){
   setInterval(checkForUpdate, 90000);
 })();
 
+document.getElementById('structCount').textContent = STRATEGIES.length;
 renderCards();
 renderInputs();
 compute();
@@ -2189,6 +2466,7 @@ initManualProtection();
 initMacroPanel();
 initCalendarPanels();
 initTicketAndJournal();
+initAccountPanel();
 </script>
 </body>
 </html>
