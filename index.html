@@ -176,6 +176,13 @@ table.vtab td:last-child{text-align:right;font-weight:600}
 .field label{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
 .field input,.field select{background:var(--surface2);border:1px solid var(--line);border-radius:7px;padding:8px 10px;font-family:var(--mono);font-size:13px}
 .field input:focus,.field select:focus{border-color:var(--accent)}
+.ac-wrap{position:relative}
+.ac-dropdown{position:absolute;top:calc(100% + 4px);left:0;right:0;max-height:240px;overflow-y:auto;-webkit-overflow-scrolling:touch;background:var(--surface2);border:1px solid var(--line);border-radius:7px;z-index:40;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+.ac-dropdown .ac-item{padding:9px 10px;font-family:var(--mono);font-size:12.5px;cursor:pointer;border-bottom:1px solid var(--line)}
+.ac-dropdown .ac-item:last-child{border-bottom:none}
+.ac-dropdown .ac-item:hover,.ac-dropdown .ac-item.active{background:var(--surface3,rgba(255,255,255,.06))}
+.ac-dropdown .ac-sym{font-weight:700;color:var(--accent)}
+.ac-dropdown .ac-name{color:var(--muted);margin-left:8px}
 .pwdwrap{position:relative;display:flex}
 .pwdwrap input{flex:1;padding-right:56px}
 .pwdtoggle{position:absolute;right:4px;top:4px;bottom:4px;border:none;background:var(--surface);color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;padding:0 10px;border-radius:5px;cursor:pointer}
@@ -340,7 +347,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
       <a href="#apikeys">API Keys</a>
       <a href="#account">Account</a>
     </nav>
-    <span class="chip verchip" id="verChip">v2.10</span>
+    <span class="chip verchip" id="verChip">v2.11</span>
     <span class="chip" id="welcomeChip" style="display:none"></span>
     <button class="btn sm" id="globalRefresh">⟳ Refresh</button>
     <span class="chip"><span class="dot"></span> Client-side · no stored data</span>
@@ -1739,7 +1746,7 @@ function renderStocksPanel(host){
         <span class="lp-status" id="stkStatus"><span class="ld"></span>Idle</span>
       </div>
       <div class="lp-row" style="flex-wrap:wrap">
-        <div class="field"><label>Symbol</label><input type="text" id="stkSymbol" list="stkSymbolList" autocomplete="off" placeholder="Type a ticker or company name" style="text-transform:uppercase" value="${lastStockSymbol||''}"><datalist id="stkSymbolList"></datalist></div>
+        <div class="field ac-wrap"><label>Symbol</label><input type="text" id="stkSymbol" autocomplete="off" placeholder="Type a ticker or company name" style="text-transform:uppercase" value="${lastStockSymbol||''}"><div class="ac-dropdown" id="stkSymbolDropdown" style="display:none"></div></div>
         <button class="btn primary" id="stkFetch">Load expiries</button>
         <div class="field" id="stkExpiryWrap" style="display:none"><label>Expiry</label><select id="stkExpiry"></select></div>
         <button class="btn" id="stkLoadLegs" style="display:none">Load live strikes into builder</button>
@@ -1756,18 +1763,31 @@ function renderStocksPanel(host){
 let stkSearchDebounce = null;
 function wireStockSymbolAutocomplete(){
   const input = document.getElementById('stkSymbol');
-  if(!input) return;
+  const dd = document.getElementById('stkSymbolDropdown');
+  if(!input || !dd) return;
   input.addEventListener('input', ()=>{
     clearTimeout(stkSearchDebounce);
     const q = input.value.trim();
-    if(q.length<1) return;
+    if(q.length<1){ dd.style.display='none'; dd.innerHTML=''; return; }
     stkSearchDebounce = setTimeout(()=>searchStockSymbols(q), 350);
   });
+  input.addEventListener('focus', ()=>{
+    if(dd.innerHTML.trim()) dd.style.display='block';
+  });
+  document.addEventListener('click', (e)=>{
+    if(e.target!==input && !dd.contains(e.target)){ dd.style.display='none'; }
+  });
+}
+function pickStockSymbol(symbol){
+  const input = document.getElementById('stkSymbol');
+  const dd = document.getElementById('stkSymbolDropdown');
+  if(input) input.value = symbol;
+  if(dd){ dd.style.display='none'; dd.innerHTML=''; }
 }
 async function searchStockSymbols(q){
   const provider = stocksProvider();
-  const list = document.getElementById('stkSymbolList');
-  if(!provider || !list) return;
+  const dd = document.getElementById('stkSymbolDropdown');
+  if(!provider || !dd) return;
   if(provider!=='alphavantage' && !apiBase) return;
   const key = stockProviderKey(provider);
   try{
@@ -1785,7 +1805,14 @@ async function searchStockSymbols(q){
       const data = await apiFetch(`/proxy/polygon/v3/reference/tickers?search=${encodeURIComponent(q)}&active=true&market=stocks&limit=12`, {headers:{'x-provider-key':key}});
       results = (data.results||[]).map(r=>({symbol:r.ticker, name:r.name}));
     }
-    list.innerHTML = results.filter(r=>r.symbol).map(r=>`<option value="${r.symbol}">${(r.name||'').replace(/"/g,'&quot;')}</option>`).join('');
+    const esc = s=>(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const filtered = results.filter(r=>r.symbol);
+    if(!filtered.length){ dd.style.display='none'; dd.innerHTML=''; return; }
+    dd.innerHTML = filtered.map(r=>`<div class="ac-item" data-sym="${esc(r.symbol)}"><span class="ac-sym">${esc(r.symbol)}</span><span class="ac-name">${esc(r.name)}</span></div>`).join('');
+    dd.querySelectorAll('.ac-item').forEach(el=>{
+      el.addEventListener('click', ()=>pickStockSymbol(el.dataset.sym));
+    });
+    dd.style.display='block';
   }catch(e){ /* autocomplete is a convenience — fail silently, manual typing still works */ }
 }
 
@@ -2608,7 +2635,7 @@ function renderVerdictContent(){
 document.getElementById('vbRefresh').addEventListener('click', refreshSignals);
 
 /* ---------- Version check / update button ---------- */
-const CURRENT_VERSION = "2.10";
+const CURRENT_VERSION = "2.11";
 let updateAvailable = null; // set to remote version string when a newer one is seen
 
 async function doRefreshData(){
