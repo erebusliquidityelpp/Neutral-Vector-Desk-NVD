@@ -305,7 +305,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
 
 <header class="top">
   <div class="wrap topbar">
-    <div class="brand">
+    <div class="brand" id="brandHome" style="cursor:pointer">
       <div class="mark">
         <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
           <defs>
@@ -339,7 +339,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
       <a href="#manual">Manual</a>
       <a href="#account">Account</a>
     </nav>
-    <span class="chip verchip" id="verChip">v2.4</span>
+    <span class="chip verchip" id="verChip">v2.5</span>
     <span class="chip" id="welcomeChip" style="display:none"></span>
     <button class="btn sm" id="globalRefresh">⟳ Refresh</button>
     <span class="chip"><span class="dot"></span> Client-side · no stored data</span>
@@ -2125,7 +2125,7 @@ function renderVerdictContent(){
 document.getElementById('vbRefresh').addEventListener('click', refreshSignals);
 
 /* ---------- Version check / update button ---------- */
-const CURRENT_VERSION = "2.4";
+const CURRENT_VERSION = "2.5";
 let updateAvailable = null; // set to remote version string when a newer one is seen
 
 async function doRefreshData(){
@@ -2396,6 +2396,11 @@ function renderJournal(){
 function exitLandingMode(){
   document.body.classList.remove('landing-mode');
 }
+function goHome(){
+  document.body.classList.add('landing-mode');
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+document.getElementById('brandHome').addEventListener('click', goHome);
 document.addEventListener('click', (e)=>{
   const a = e.target.closest('a[href^="#"]');
   if(!a) return;
