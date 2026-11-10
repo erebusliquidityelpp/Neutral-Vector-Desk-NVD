@@ -357,7 +357,7 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
       <a href="#apikeys">API Keys</a>
       <a href="#account">Account</a>
     </nav>
-    <span class="chip verchip" id="verChip">v2.12</span>
+    <span class="chip verchip" id="verChip">v2.13</span>
     <span class="chip" id="welcomeChip" style="display:none"></span>
     <button class="btn sm" id="globalRefresh">⟳ Refresh</button>
     <span class="chip"><span class="dot"></span> Client-side · no stored data</span>
@@ -620,6 +620,12 @@ footer{padding:30px 0 50px;color:var(--muted);font-size:12px;display:flex;justif
       </div>
       <div class="note">Get a free key in seconds at <code>alphavantage.co/support/#api-key</code> — no card, no paid tier required for these endpoints (rate-limited to 25 calls/day on the free tier, which this panel respects by batching one call per indicator per refresh). The key is stored only in your browser's local storage.</div>
       <div id="macroHost"></div>
+    </div>
+
+    <div class="livepanel gated">
+      <div class="lp-head"><b>Fundamentals &amp; News, by market</b></div>
+      <div class="note">Six independent, worldwide news feeds — Crypto, Stocks, Forex, Bonds, Treasuries, and Dividends — each pulling its own free, public coverage and synthesizing its own bullish/bearish/mixed verdict and impact read, separate from (and not tied to) whatever symbol is active in the Builder or Prediction Radar above. Each subsection refreshes independently on its own button, using the same Alpha Vantage key saved above.</div>
+      <div id="macroNewsHost"></div>
     </div>
     <p class="gatenote">Sign in to view the full Macro Fundamentals panel.</p>
   </div>
@@ -1495,6 +1501,7 @@ function renderApiKeysPanel(){
       setKey(f.store, val);
       const st = document.getElementById(`apikeystatus-${f.store}`);
       st.innerHTML = `<span class="ld ${val?'ok':''}"></span>${val?'Saved':'Not set'}`;
+      if(f.store==='macro'){ renderMacroNewsSections(); renderNewsPanel(); }
     });
   });
   document.getElementById('stocksProviderSel').addEventListener('change', (e)=>{
@@ -2473,15 +2480,9 @@ function fmtNewsTime(t){
   return d.toLocaleDateString();
 }
 
-async function fetchNewsSentiment(){
-  const ctx = newsContextForAsset();
-  if(!ctx) return;
+async function fetchNewsForCtx(ctx){
   const key = getKeys().macro;
-  if(!key) return;
-  const st = document.getElementById('newsStatus');
-  const btn = document.getElementById('newsRefresh');
-  if(st) st.innerHTML = `<span class="ld"></span>Loading…`;
-  if(btn) btn.disabled = true;
+  if(!key){ newsCache[ctx.key] = {error:'No Alpha Vantage key saved.', fetchedAt:Date.now()}; return; }
   try{
     const params = new URLSearchParams({function:'NEWS_SENTIMENT', sort:'LATEST', limit:'15', apikey:key});
     if(ctx.tickers) params.set('tickers', ctx.tickers);
@@ -2490,7 +2491,7 @@ async function fetchNewsSentiment(){
     const data = await res.json();
     if(data.Information || data.Note || data['Error Message']) throw new Error(data.Information || data.Note || data['Error Message']);
     const feed = data.feed || [];
-    if(!feed.length){ newsCache[ctx.key] = {articles:[], verdict:null, fetchedAt:Date.now()}; renderNewsPanel(); return; }
+    if(!feed.length){ newsCache[ctx.key] = {articles:[], verdict:null, fetchedAt:Date.now()}; return; }
     const tickerList = ctx.tickers ? ctx.tickers.split(',') : [];
     let wsum=0, wtot=0;
     const articles = feed.map(a=>{
@@ -2509,6 +2510,55 @@ async function fetchNewsSentiment(){
   }catch(e){
     newsCache[ctx.key] = {error:e.message, fetchedAt:Date.now()};
   }
+}
+
+function newsBodyHtml(label, cache, opts){
+  opts = opts||{};
+  if(!cache){
+    return `<div class="note">${opts.introNote || `Pulls the latest free, public headlines relevant to <b>${label}</b> from global outlets (Alpha Vantage News &amp; Sentiment) and synthesizes a bullish/bearish skew read for it.`} Manual refresh only — this shares a 25-calls/day Alpha Vantage free-tier budget with every other panel using that key, so it's never pulled automatically.</div>`;
+  }
+  if(cache.error){
+    return `<div class="radarempty">${cache.error}</div>`;
+  }
+  if(!cache.articles.length){
+    return `<div class="radarempty">No recent public articles matched ${label}.</div>`;
+  }
+  const v = cache.verdict;
+  const impactLine = v.cls==='go'
+    ? `Coverage skews ${v.label.replace(' SKEW','').toLowerCase()} — that's a directional catalyst sitting under this right now, which favors long-vol/directional structures (straddle, strangle, the backspreads) over short-premium ones that need the underlying to sit still.`
+    : v.cls==='avoid'
+    ? `Coverage skews ${v.label.replace(' SKEW','').toLowerCase()} — same catalyst-risk read as a bullish skew, just pointed the other way: favor long-vol/directional structures over short-premium ones here too.`
+    : `Coverage is mixed or muted — no clear directional catalyst in the headlines right now, which is the more comfortable backdrop for short-premium, range-bound structures (condor, butterfly, calendar).`;
+  return `
+    <div class="radarverdict">
+      <h4><span class="vpill v-${v.cls}">${v.label}</span> <span style="color:var(--muted);font-size:12px;font-weight:400">sentiment score ${v.score.toFixed(2)} (Alpha Vantage, −1 to +1)</span></h4>
+      <ul><li>${impactLine}</li></ul>
+    </div>
+    <div class="newslist">
+      ${cache.articles.slice(0,12).map(a=>`
+        <a class="newsitem" href="${a.url}" target="_blank" rel="noopener noreferrer">
+          <div class="newsitem-top">
+            <span class="newslabel ${newsLabelCls(a.label)}">${a.label||'—'}</span>
+            <span class="newsmeta">${a.source||''}${a.time?' · '+fmtNewsTime(a.time):''}${a.rel!=null && !isNaN(a.rel)?' · relevance '+a.rel.toFixed(2):''}</span>
+          </div>
+          <div class="newstitle">${a.title}</div>
+        </a>
+      `).join('')}
+    </div>
+    <p class="acnote" style="margin-top:10px">Headlines and sentiment scoring from Alpha Vantage's News &amp; Sentiment feed (free tier, global outlets) — this is a skew in the coverage, not a price guarantee. Read the article itself before treating it as a real catalyst.</p>
+  `;
+}
+
+/* ---- Prediction Radar's own asset-linked news panel ---- */
+async function fetchNewsSentiment(){
+  const ctx = newsContextForAsset();
+  if(!ctx) return;
+  if(!getKeys().macro) return;
+  const st = document.getElementById('newsStatus');
+  const btn = document.getElementById('newsRefresh');
+  if(st) st.innerHTML = `<span class="ld"></span>Loading…`;
+  if(btn) btn.disabled = true;
+  await fetchNewsForCtx(ctx);
   renderNewsPanel();
 }
 
@@ -2526,49 +2576,72 @@ function renderNewsPanel(){
     return;
   }
   const cache = newsCache[ctx.key];
-  let body;
-  if(!cache){
-    body = `<div class="note">Pulls the latest free, public headlines relevant to <b>${ctx.label}</b> from global outlets (Alpha Vantage News &amp; Sentiment — macro, earnings, policy, and asset-specific coverage) and synthesizes a bullish/bearish skew read for it. Manual refresh only — this shares your 25-calls/day Alpha Vantage free-tier budget with Macro Fundamentals and the Stocks tab, so it isn't pulled automatically.</div>`;
-  } else if(cache.error){
-    body = `<div class="radarempty">${cache.error}</div>`;
-  } else if(!cache.articles.length){
-    body = `<div class="radarempty">No recent public articles matched ${ctx.label}.</div>`;
-  } else {
-    const v = cache.verdict;
-    const impactLine = v.cls==='go'
-      ? `Coverage skews ${v.label.replace(' SKEW','').toLowerCase()} — that's a directional catalyst sitting under the position right now, which favors long-vol/directional structures (straddle, strangle, the backspreads) over short-premium ones that need the underlying to sit still.`
-      : v.cls==='avoid'
-      ? `Coverage skews ${v.label.replace(' SKEW','').toLowerCase()} — same catalyst-risk read as a bullish skew, just pointed the other way: favor long-vol/directional structures over short-premium ones here too.`
-      : `Coverage is mixed or muted — no clear directional catalyst in the headlines right now, which is the more comfortable backdrop for short-premium, range-bound structures (condor, butterfly, calendar).`;
-    body = `
-      <div class="radarverdict">
-        <h4><span class="vpill v-${v.cls}">${v.label}</span> <span style="color:var(--muted);font-size:12px;font-weight:400">sentiment score ${v.score.toFixed(2)} (Alpha Vantage, −1 to +1)</span></h4>
-        <ul><li>${impactLine}</li></ul>
-      </div>
-      <div class="newslist">
-        ${cache.articles.slice(0,12).map(a=>`
-          <a class="newsitem" href="${a.url}" target="_blank" rel="noopener noreferrer">
-            <div class="newsitem-top">
-              <span class="newslabel ${newsLabelCls(a.label)}">${a.label||'—'}</span>
-              <span class="newsmeta">${a.source||''}${a.time?' · '+fmtNewsTime(a.time):''}${a.rel!=null && !isNaN(a.rel)?' · relevance '+a.rel.toFixed(2):''}</span>
-            </div>
-            <div class="newstitle">${a.title}</div>
-          </a>
-        `).join('')}
-      </div>
-      <p class="acnote" style="margin-top:10px">Headlines and sentiment scoring from Alpha Vantage's News &amp; Sentiment feed (free tier, global outlets) — this is a skew in the coverage, not a price guarantee. Read the article itself before treating it as a real catalyst.</p>
-    `;
-  }
   host.innerHTML = `
     <div class="lp-head">
       <b>Fundamentals &amp; News — ${ctx.label}</b>
       <span class="lp-status" id="newsStatus">${cache&&cache.fetchedAt?`<span class="ld ${cache.error?'err':'ok'}"></span>Updated ${new Date(cache.fetchedAt).toLocaleTimeString()}`:`<span class="ld"></span>Not loaded yet`}</span>
     </div>
     <div class="lp-row"><button class="btn primary" id="newsRefresh">Refresh news</button></div>
-    ${body}
+    ${newsBodyHtml(ctx.label, cache)}
   `;
   const btn = document.getElementById('newsRefresh');
   if(btn) btn.addEventListener('click', fetchNewsSentiment);
+}
+
+/* ---- Macro Fundamentals: six standalone, symbol-independent news subsections ---- */
+const MACRO_NEWS_SECTIONS = [
+  {id:'mnCrypto', title:'Crypto', key:'macro:crypto', tickers:null, topics:'blockchain',
+    introNote:'Broad crypto/blockchain coverage worldwide — not tied to one coin (for a single coin\'s own news, use Prediction Radar above with that coin selected).'},
+  {id:'mnStock', title:'Stocks', key:'macro:stocks', tickers:null, topics:'financial_markets,earnings',
+    introNote:'Broad equity-market coverage worldwide — not tied to one ticker (for a single symbol\'s own news, use Prediction Radar above with that symbol loaded).'},
+  {id:'mnForex', title:'Forex', key:'macro:forex', tickers:'FOREX:USD,FOREX:EUR,FOREX:GBP,FOREX:JPY', topics:null,
+    introNote:'Major-currency coverage worldwide (USD, EUR, GBP, JPY) — Alpha Vantage has no general "forex" topic, so this follows the four most-traded currencies instead.'},
+  {id:'mnBonds', title:'Bonds', key:'macro:bonds', tickers:null, topics:'finance,financial_markets',
+    introNote:'Credit/bond-market coverage worldwide — Alpha Vantage has no bond-specific topic, so this uses its broad finance and financial-markets topics as the nearest free proxy.'},
+  {id:'mnTreasuries', title:'Treasuries', key:'macro:treasuries', tickers:null, topics:'economy_monetary,economy_fiscal',
+    introNote:'Central-bank policy, rates, and fiscal coverage worldwide — the news that actually moves Treasury yields, kept separate from the broader Bonds feed above.'},
+  {id:'mnDividends', title:'Dividends', key:'macro:dividends', tickers:null, topics:'earnings',
+    introNote:'Alpha Vantage has no dedicated dividend-news topic — earnings coverage is the nearest free proxy and commonly includes dividend declarations, cuts, and special payouts.'}
+];
+
+async function fetchMacroNewsSection(sectionId){
+  const section = MACRO_NEWS_SECTIONS.find(s=>s.id===sectionId);
+  if(!section) return;
+  const st = document.getElementById(`${section.id}Status`);
+  const btn = document.getElementById(`${section.id}Refresh`);
+  if(st) st.innerHTML = `<span class="ld"></span>Loading…`;
+  if(btn) btn.disabled = true;
+  await fetchNewsForCtx(section);
+  renderMacroNewsSections();
+}
+
+function renderMacroNewsSections(){
+  const host = document.getElementById('macroNewsHost');
+  if(!host) return;
+  const key = getKeys().macro;
+  host.innerHTML = MACRO_NEWS_SECTIONS.map(section=>{
+    const cache = newsCache[section.key];
+    if(!key){
+      return `
+        <div class="livepanel" style="margin-bottom:14px">
+          <div class="lp-head"><b>${section.title}</b></div>
+          <div class="radarempty">No Alpha Vantage key saved — add one in <a href="#apikeys">API Keys</a> to enable Fundamentals &amp; News for every subsection here.</div>
+        </div>`;
+    }
+    return `
+      <div class="livepanel" style="margin-bottom:14px">
+        <div class="lp-head">
+          <b>${section.title}</b>
+          <span class="lp-status" id="${section.id}Status">${cache&&cache.fetchedAt?`<span class="ld ${cache.error?'err':'ok'}"></span>Updated ${new Date(cache.fetchedAt).toLocaleTimeString()}`:`<span class="ld"></span>Not loaded yet`}</span>
+        </div>
+        <div class="lp-row"><button class="btn primary" id="${section.id}Refresh">Refresh ${section.title.toLowerCase()} news</button></div>
+        ${newsBodyHtml(section.title, cache, {introNote:section.introNote})}
+      </div>`;
+  }).join('');
+  MACRO_NEWS_SECTIONS.forEach(section=>{
+    const btn = document.getElementById(`${section.id}Refresh`);
+    if(btn) btn.addEventListener('click', ()=>fetchMacroNewsSection(section.id));
+  });
 }
 
 function renderPredictionRadar(){
@@ -2798,7 +2871,7 @@ function renderVerdictContent(){
 document.getElementById('vbRefresh').addEventListener('click', refreshSignals);
 
 /* ---------- Version check / update button ---------- */
-const CURRENT_VERSION = "2.12";
+const CURRENT_VERSION = "2.13";
 let updateAvailable = null; // set to remote version string when a newer one is seen
 
 async function doRefreshData(){
@@ -3333,6 +3406,7 @@ renderAcademyStrategies();
 renderStockNotes();
 initManualProtection();
 initMacroPanel();
+renderMacroNewsSections();
 initCalendarPanels();
 initTicketAndJournal();
 initAccountPanel();
